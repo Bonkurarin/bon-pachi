@@ -1092,6 +1092,26 @@ function updateUI() {
   $('sHold').textContent = state.queue.length;
   $('sSpin').textContent = state.spins;
 }
+/* ---------- 年齢確認（18歳以上） ---------- */
+(function ageGate() {
+  let ok = false; try { ok = localStorage.getItem('bonutopia_age18') === '1'; } catch (e) {}
+  if (ok) return;
+  const ov = document.createElement('div'); ov.id = 'ageOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;background:rgba(20,10,50,.92);padding:16px';
+  const box = document.createElement('div'); box.className = 'box'; box.style.cssText = 'width:min(92vw,420px);text-align:center';
+  ov.appendChild(box); document.body.appendChild(ov);
+  const ask = () => {
+    box.innerHTML = '<h2 style="font-size:22px">年齢確認</h2><p style="font-weight:800;line-height:1.7;margin:10px 0 14px">このゲームは18歳以上の方を対象としています。<br>年齢が18歳以上であることを確認してください。</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px"><button class="big go" id="ageYes">はい、18歳以上です</button><button class="big" id="ageNo">いいえ</button></div>';
+    document.getElementById('ageYes').onclick = () => { try { localStorage.setItem('bonutopia_age18', '1'); } catch (e) {} ov.remove(); };
+    document.getElementById('ageNo').onclick = () => { location.href = 'https://bonkurarin.github.io/bon-museum/'; };
+  };
+  const deny = () => {
+    box.innerHTML = '<h2 style="font-size:20px">ご利用いただけません</h2><p style="font-weight:800;line-height:1.7;margin:10px 0 14px">このゲームは18歳以上の方のみ遊べます。<br>ご理解ありがとうございます。</p><button class="big" id="ageBack">年齢確認にもどる</button>';
+    document.getElementById('ageBack').onclick = ask;
+  };
+  ask();
+})();
 /* ---------- デバッグモード（「大当たり」の文字をタッチ → 暗証番号）：打ち放題 ---------- */
 let debugMode = false;
 const DEBUG_CODE = '8284';
