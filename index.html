@@ -275,7 +275,7 @@ SYMBOLS.forEach((k, i) => SYM_DEFS.push({ kind: 'bon', bon: i, label: SYMBOL_NAM
 SYM_DEFS.push({ kind: 'star', label: 'STAR', w: 8 }, { kind: 'fever', label: 'FEVER', w: 8 });
 const SEVEN = 6;
 function drawLottery() {
-  const win = Math.random() < 1 / LOTTERY.prob;
+  const win = Math.random() < 1 / probNow();
   let symIdx = null;
   if (win) {
     let r = Math.random() * SYM_DEFS.reduce((a, d) => a + d.w, 0);
@@ -317,6 +317,10 @@ const DIR_CFG = {
   yokokuCount: { win: [15, 40, 45], lose: [55, 35, 10] }, // 予告0/1/2個の重み
 };
 const BONUS = { rounds: 10, perRound: 10, perBall: 15, roundTimeout: 18, gap: 1.4, introTime: 7.2, premIntroTime: 12.5 };
+const PRIZE = { hes: 3, den: 1 };   // 賞球（入賞したときに戻る玉）
+const DEN = { x: 410, y: 490, w: 36, h: 12 };   // 電チュー（右ヘソ）
+let denT = 0;
+const denOpen = () => supportOn() && denT % 1.5 < 1.1;
 const ATT = { x: 402, y: 588, w: 64, h: 14 }; // 大当たり中に開く右アタッカー
 
 function wpick(keys, wf) {
@@ -356,11 +360,12 @@ function planDirection(res) {
 
 /* ---------- 演出の状態 ---------- */
 const lcd = { phase: 'idle', t: 0, res: null, plan: null, stopped: [false, false, false], fired: {}, skipped: false };
-const bonus = { round: 0, count: 0, gained: 0, open: false, timer: 0, gapT: 0, premium: false };
+const bonus = { sym: 0, round: 0, count: 0, gained: 0, open: false, timer: 0, gapT: 0, premium: false };
 const inBonus = () => lcd.phase === 'rounds';
 const once = (k, fn) => { if (!lcd.fired[k]) { lcd.fired[k] = 1; fn(); } };
 function startNextSpin() {
   if (lcd.phase !== 'idle' || state.queue.length === 0) return;
+  dm('spin');
   lcd.res = state.queue.shift(); lcd.plan = planDirection(lcd.res);
   lcd.phase = 'spin'; lcd.t = 0; lcd.stopped = [false, false, false]; lcd.fired = {}; lcd.skipped = false; state.spins++;
 }
@@ -369,7 +374,8 @@ function onStart() {
   if (state.queue.length < LOTTERY.holdMax) state.queue.push(drawLottery());
   startNextSpin();
 }
-function startRounds(round, gained, premium) {
+function startRounds(round, gained, premium, sym) {
+  if (typeof sym === 'number') bonus.sym = sym; MODE.k = 'bonus'; MODE.left = 0;
   lcd.phase = 'rounds'; lcd.t = 0; bonus.round = round || 1; bonus.gained = gained || 0; bonus.premium = !!premium;
   bonus.open = false; bonus.gapT = 0; openRound(); bgmPlay(premium ? 'premium' : 'bonus');
   setSide('R'); toast('右打ちに切り替え！右ルートを狙って打ってね');
@@ -387,16 +393,17 @@ function skipEffect() {
 }
 function updateLCD(dt) {
   const ph = lcd.phase; if (ph === 'idle') return;
-  lcd.t += dt; const t = lcd.t;
+  lcd.t += (ph === 'spin' || ph === 'result') && supportOn() ? dt * 2.2 : dt; const t = lcd.t;
   if (ph === 'spin') {
     const P = lcd.plan;
-    P.yokoku.forEach((y, i) => { if (t >= y.at) once('yk' + i, () => { if (!lcd.skipped) playYokokuSe(y.id); }); });
+    P.yokoku.forEach((y, i) => { if (t >= y.at) once('yk' + i, () => { if (!lcd.skipped) playYokokuSe(y.id); dexMark('yk', y.id); if (y.id === 'cutin') bonSeen(P.chars[0]); if (y.id === 'niji-appear') bonSeen(6); if (y.id === 'seven-bons') for (let b = 0; b < 7; b++) bonSeen(b); }); });
     P.stops.forEach((st, i) => { if (!lcd.stopped[i] && t >= st) { lcd.stopped[i] = true; if (!lcd.skipped) sfxReelStop(i); } });
-    if (P.reach && !lcd.skipped && t >= P.R) once('reach', () => { sfxReach(); if (P.reach === 'special') bgmPlay('special'); if (P.reach === 'niji') sfxNiji(); });
+    if (P.reach && !lcd.skipped && t >= P.R) once('reach', () => { dexMark('rc', P.reach); if (P.reach === 'bon' || P.reach === 'coop') bonSeen(P.chars[0]); if (P.reach === 'niji') bonSeen(6); sfxReach(); if (P.reach === 'special') bgmPlay('special'); if (P.reach === 'niji') sfxNiji(); });
     if (lcd.stopped[0] && lcd.stopped[1] && lcd.stopped[2]) {
       bgmStop();
-      if (lcd.res.win) { state.wins++; lcd.phase = 'intro'; lcd.t = 0; lcd.fired = {}; }
-      else { lcd.phase = 'result'; lcd.t = 0; }
+      P.sym.forEach(x => { G.dex.symSeen[x] = 1; });
+      if (lcd.res.win) { state.wins++; onWin(lcd.res); dexMark('sp', P.premium ? 'premium' : 'win'); if (P.premium) G.rec.premium++; if (lcd.res.symIdx === SEVEN) dexMark('sp', 'seven'); lcd.phase = 'intro'; lcd.t = 0; lcd.fired = {}; }
+      else { onLose(); lcd.phase = 'result'; lcd.t = 0; }
     }
   } else if (ph === 'result') {
     if (t >= 1.2) { lcd.phase = 'idle'; lcd.res = null; lcd.plan = null; startNextSpin(); }
@@ -417,7 +424,7 @@ function updateLCD(dt) {
       if (bonus.count >= BONUS.perRound || bonus.timer >= BONUS.roundTimeout) { bonus.open = false; bonus.gapT = 0; if (bonus.round < BONUS.rounds) sfxRoundEnd(); }
     } else {
       bonus.gapT += dt;
-      if (bonus.round >= BONUS.rounds) { lcd.phase = 'finish'; lcd.t = 0; bgmStop(); sfxFanfare(); setSide('L'); toast('大当たり終了。左打ちに戻したよ'); }
+      if (bonus.round >= BONUS.rounds) { lcd.phase = 'finish'; lcd.t = 0; bgmStop(); sfxFanfare(); endBonusMode(); saveGame(); }
       else if (bonus.gapT >= BONUS.gap) { bonus.round++; openRound(); }
     }
   } else if (ph === 'finish') {
@@ -429,8 +436,11 @@ function catchBall() { bonus.count++; bonus.gained += BONUS.perBall; state.have 
 /* ---------- 描画ヘルパー ---------- */
 const RB = ['#ff4d4d', '#ff9f1c', '#ffe14d', '#3ddc84', '#3a8dff', '#7a5cff', '#d05cff'];
 const NUMCOL = ['#ff6b6b', '#ffa94d', '#ffe066', '#69db7c', '#4dabf7', '#9775fa', '#ff2d2d'];
+let rainArtImg = null;   // にじボンの立ち絵（タイトルと同じ新しい絵）
 function drawBonFull(c, bi, cx, bottom, h, alpha, flip) {
-  const im = symImgs[bi]; if (!im.complete || !im.naturalWidth) return;
+  let im = symImgs[bi];
+  if (bi === 6 && typeof TITLE_ART !== 'undefined') { if (!rainArtImg) { rainArtImg = new Image(); rainArtImg.src = TITLE_ART.rainbow; } if (rainArtImg.complete && rainArtImg.naturalWidth) { im = rainArtImg; if (h <= 220) h *= 1.45; } }   // 液晶の中では大きめに
+  if (!im.complete || !im.naturalWidth) return;
   const w = h * im.naturalWidth / im.naturalHeight; c.save(); c.globalAlpha = alpha == null ? 1 : alpha;
   if (flip) { c.translate(cx, 0); c.scale(-1, 1); c.drawImage(im, -w / 2, bottom - h, w, h); }
   else c.drawImage(im, cx - w / 2, bottom - h, w, h);
@@ -594,6 +604,13 @@ function drawLCD(c) {
     if (i < state.queue.length) { c.fillStyle = '#ff4d4d'; c.shadowColor = '#ff4d4d'; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0; } else { c.fillStyle = 'rgba(255,255,255,.14)'; c.fill(); }
     c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.stroke();
   }
+  if (supportOn()) {
+    const kk = MODE.k === 'kaku', txt = kk ? '確変中' : `時短 残り${MODE.left}`;
+    c.font = 'bold 11px sans-serif'; c.textAlign = 'left'; const w = c.measureText(txt).width + 14;
+    c.fillStyle = kk ? 'rgba(255,60,90,.88)' : 'rgba(40,150,255,.88)'; roundRect(c, LCD.x + 6, LCD.y + 6, w, 18, 9); c.fill();
+    c.fillStyle = '#fff'; c.textBaseline = 'middle'; c.fillText(txt, LCD.x + 13, LCD.y + 15.5);
+    if (G.chain >= 2) { c.textAlign = 'right'; c.fillStyle = '#ffe14d'; c.fillText(`${G.chain}連チャン`, LCD.x + LCD.w - 8, LCD.y + 15.5); }
+  }
   c.restore(); c.restore();
 }
 /* アタッカー（大当たり中のみ開く）と、大当たり導入の全画面演出 */
@@ -714,7 +731,7 @@ function fireBall() {
   const v = speedOf() * (1 + (Math.random() - 0.5) * 0.03);
   balls.push({ x: 20 + Math.random() * 3, y: H - 30, vx: v * LANE_S + (Math.random() - 0.5) * 12, vy: -v, slow: 0 });
   if (!inBonus() && !debugMode) state.have--;
-  state.shot++;
+  state.shot++; dm('shot');
   sfxFire();
   return true;
 }
@@ -783,6 +800,7 @@ function hitSeg(b, ax, ay, bx, by, rad, e, jitter) {
 }
 const attOpen = () => bonus.open && lcd.phase === 'rounds';
 function collideRoute(b) {
+  if (!denOpen()) hitSeg(b, DEN.x - 5, DEN.y - 4, DEN.x + DEN.w + 5, DEN.y + 2, 2.2, 0.35, 0.1); // 閉じている間のフタ
   hitSeg(b, STG.x0, STG.y0, STG.x1, STG.y1, 2.4, 0.25, 0.05);
   hitSeg(b, CH.x, CH.y0, CH.x, CH.y1, 2.6, 0.4, 0.1);
   if (!attOpen()) hitSeg(b, ATT.x + ATT.w + 4, ATT.y - 2, ATT.x - 8, ATT.y + 16, 2.2, 0.35, 0.1); // 閉じているときは斜めのフタ
@@ -828,7 +846,7 @@ function collideBalls() {
 }
 
 function step(h) {
-  const g = CONFIG.gravity;
+  const g = CONFIG.gravity; denT += h;
   WM[0].a += 1.5 * h; WM[1].a -= 1.8 * h;
   for (const b of balls) {
     b.vy += g * h;
@@ -855,7 +873,11 @@ function postStep(dt) {
     const b = balls[i];
     // STARTチャッカー入賞
     if (b.x > CHUCKER.x && b.x < CHUCKER.x + CHUCKER.w && b.y > CHUCKER.y && b.y < CHUCKER.y + CHUCKER.h) {
-      state.hit++; flash = 1; onStart(); balls.splice(i, 1); continue;
+      state.hit++; dm('hit'); state.have += PRIZE.hes; flash = 1; onStart(); balls.splice(i, 1); continue;
+    }
+    // 電チュー（右ヘソ）：確変・時短中だけ開く
+    if (denOpen() && b.x > DEN.x && b.x < DEN.x + DEN.w && b.y > DEN.y && b.y < DEN.y + DEN.h) {
+      state.hit++; dm('hit'); dm('den'); G.rec.den++; dexMark('sp', 'den'); state.have += PRIZE.den; flash = 0.6; onStart(); balls.splice(i, 1); continue;
     }
     // アタッカー（大当たり中のみ）
     if (attOpen() && b.y > ATT.y && b.y < ATT.y + ATT.h && b.x > ATT.x && b.x < ATT.x + ATT.w) { catchBall(); balls.splice(i, 1); continue; }
@@ -998,6 +1020,14 @@ function drawYaku() {
   c.fillStyle = win ? `hsl(${(t * 300) % 360},100%,70%)` : '#ffd86b'; starPath(c, x, y + 1, 10); c.fill();
   c.restore();
 }
+function drawDen() {
+  const c = ctx, t = performance.now() / 1000, open = denOpen(); c.save(); c.scale(S, S); c.lineCap = 'round';
+  c.fillStyle = '#0a0a14'; roundRect(c, DEN.x, DEN.y, DEN.w, DEN.h, 3); c.fill();
+  c.strokeStyle = open ? `hsl(${(t * 240) % 360},100%,65%)` : '#8a6410'; c.lineWidth = 2; roundRect(c, DEN.x - 2, DEN.y - 2, DEN.w + 4, DEN.h + 4, 4); c.stroke();
+  if (!open) { c.strokeStyle = '#7a5410'; c.lineWidth = 5; c.beginPath(); c.moveTo(DEN.x - 5, DEN.y - 4); c.lineTo(DEN.x + DEN.w + 5, DEN.y + 2); c.stroke(); c.strokeStyle = '#ffeaa0'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(DEN.x - 5, DEN.y - 5); c.lineTo(DEN.x + DEN.w + 5, DEN.y + 1); c.stroke(); }
+  c.font = 'bold 8px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = open ? '#ffe14d' : 'rgba(255,255,255,.55)'; c.fillText('電チュー', DEN.x + DEN.w / 2, DEN.y + DEN.h + 11);
+  c.restore();
+}
 function drawWindmills() {
   const c = ctx; c.save(); c.scale(S, S);
   for (const w of WM) {
@@ -1062,7 +1092,7 @@ function resize() {
 function draw() {
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.drawImage(staticLayer, 0, 0);
-  drawWindmills(); drawYaku(); drawAttacker();
+  drawWindmills(); drawDen(); drawYaku(); drawAttacker();
   const r = ballSprite.width / 2;
   for (const b of balls) ctx.drawImage(ballSprite, b.x * S - r, b.y * S - r);
   if (flash > 0) {
@@ -1200,6 +1230,37 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 /* ============================================================
    BON UTOPIA：ボンコイン・貸玉・セーブ（課金/換金なし）
    ============================================================ */
+/* ---------- 確変・時短・進行データ ---------- */
+const MODE = { k: 'normal', left: 0 };           // normal / kaku(確変) / jitan(時短) / bonus(大当たり中)
+const JITAN_SPINS = 100;
+const KAKU_SYMS = new Set([1, 3, 5, 6, 14, 15]);  // 数字2・4・6・7、STAR、FEVER の大当たりは確変
+const supportOn = () => MODE.k === 'kaku' || MODE.k === 'jitan';
+function probNow() { return MODE.k === 'kaku' ? Math.max(2, Math.round(LOTTERY.prob / 7)) : LOTTERY.prob; }
+const todayKey = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const newG = () => ({ login: { last: '', streak: 0, total: 0 }, daily: { date: '', m: {}, claimed: {} }, gacha: { date: '', cards: {} },
+  dex: { sym: {}, symSeen: {}, yk: {}, rc: {}, sp: {}, bon: {} }, rec: { bestChain: 0, kaku: 0, jitan: 0, seven: 0, premium: 0, den: 0, gacha: 0, quizOk: 0, quizAll: 0 }, ach: {}, chain: 0, quiz: { date: '', count: 0, ok: 0, asked: [] } });
+let G = newG();
+function dailyCheck() { const t = todayKey(); if (G.daily.date !== t) G.daily = { date: t, m: {}, claimed: {} }; }
+function dm(id, n = 1) { dailyCheck(); G.daily.m[id] = (G.daily.m[id] || 0) + n; }
+function dexMark(kind, id) { G.dex[kind][id] = (G.dex[kind][id] || 0) + 1; }
+function bonSeen(i) { if (i >= 0 && i < 7) G.dex.bon[i] = (G.dex.bon[i] || 0) + 1; }
+function onWin(res) {   // 当たりが確定して液晶が揃った時点の記録
+  bonus.sym = res.symIdx;
+  G.chain = supportOn() ? (G.chain || 0) + 1 : 1;
+  if (G.chain > G.rec.bestChain) G.rec.bestChain = G.chain;
+  MODE.k = 'bonus'; MODE.left = 0;
+  dexMark('sym', res.symIdx); if (res.symIdx >= 7 && res.symIdx <= 13) bonSeen(res.symIdx - 7);
+  if (res.symIdx === SEVEN) G.rec.seven++;
+  dm('win');
+}
+function onLose() {
+  if (MODE.k === 'jitan') { MODE.left--; if (MODE.left <= 0) { MODE.k = 'normal'; G.chain = 0; setSide('L'); toast('時短が終わったよ。左打ちに戻そう'); } }
+}
+function endBonusMode() {   // 10ラウンド終了：図柄で確変／時短へ
+  if (KAKU_SYMS.has(bonus.sym)) { MODE.k = 'kaku'; MODE.left = 0; G.rec.kaku++; dexMark('sp', 'kaku'); toast('確変突入！右打ちで電チューを狙え！'); }
+  else { MODE.k = 'jitan'; MODE.left = JITAN_SPINS; G.rec.jitan++; dexMark('sp', 'jitan'); toast(`時短 ${JITAN_SPINS}回転！右打ちで電チューを狙え！`); }
+  setSide('R');
+}
 const COIN = { max: 5, recoverMs: 60 * 60 * 1000, key: 'bonutopia_v1' };
 const RATES = {
   4: { lend: 250,  interval: 0.35, label: '4円パチンコ', note: '貸玉250玉・じっくり打てる(玉の価値 大)' },
@@ -1213,12 +1274,14 @@ function loadGame() {
   let d = null;
   try { d = JSON.parse(localStorage.getItem(COIN.key)); } catch (e) {}
   if (d && typeof d.coins === 'number') {
-    save = { coins: Math.min(COIN.max, Math.max(0, d.coins | 0)), nextAt: d.nextAt || null, rate: d.rate === 1 ? 1 : 4 };
+    save = { coins: Math.min(99, Math.max(0, d.coins | 0)), nextAt: d.nextAt || null, rate: d.rate === 1 ? 1 : 4 };
+    if (d.g && typeof d.g === 'object') { const base = newG(); for (const k of Object.keys(base)) { const v = d.g[k]; base[k] = (v !== undefined && typeof v === typeof base[k]) ? (typeof v === 'object' ? Object.assign(base[k], v) : v) : base[k]; } G = base; }
+    if (d.mode && (d.mode.k === 'kaku' || d.mode.k === 'jitan')) { MODE.k = d.mode.k; MODE.left = Math.max(0, d.mode.left | 0); }
     const st = d.state || {};
     const pd = d.pending;
     if (pd && typeof pd === 'object') {
       const okRes = r => r && typeof r.win === 'boolean' && (!r.win || (Number.isInteger(r.symIdx) && r.symIdx >= 0 && r.symIdx < SYM_DEFS.length));
-      pendingLoaded = { queue: (pd.queue || []).filter(okRes).slice(0, LOTTERY.holdMax), cur: okRes(pd.cur) ? pd.cur : null, bonus: pd.bonus && typeof pd.bonus.round === 'number' ? { round: Math.min(BONUS.rounds, Math.max(1, pd.bonus.round | 0)), gained: Math.max(0, pd.bonus.gained | 0), premium: !!pd.bonus.premium } : null };
+      pendingLoaded = { queue: (pd.queue || []).filter(okRes).slice(0, LOTTERY.holdMax), cur: okRes(pd.cur) ? pd.cur : null, bonus: pd.bonus && typeof pd.bonus.round === 'number' ? { round: Math.min(BONUS.rounds, Math.max(1, pd.bonus.round | 0)), gained: Math.max(0, pd.bonus.gained | 0), premium: !!pd.bonus.premium, sym: Number.isInteger(pd.bonus.sym) ? pd.bonus.sym : 0 } : null };
     }
     for (const k of ['have', 'shot', 'hit', 'out', 'spins', 'wins', 'plays', 'maxHave']) if (typeof st[k] === 'number') state[k] = Math.max(0, st[k] | 0);
   } else {
@@ -1230,11 +1293,11 @@ function saveGame() {
   try {
     const s = state;
     localStorage.setItem(COIN.key, JSON.stringify({
-      v: 1, coins: save.coins, nextAt: save.nextAt, rate: save.rate, savedAt: Date.now(),
+      v: 2, coins: save.coins, nextAt: save.nextAt, rate: save.rate, savedAt: Date.now(), mode: { k: MODE.k === 'bonus' ? 'normal' : MODE.k, left: MODE.left }, g: G,
       pending: {
         queue: s.queue.map(r => ({ win: r.win, symIdx: r.symIdx })),
         cur: lcd.phase === 'spin' && lcd.res ? { win: lcd.res.win, symIdx: lcd.res.symIdx } : null,
-        bonus: (lcd.phase === 'intro' || lcd.phase === 'rounds') ? { round: lcd.phase === 'rounds' ? bonus.round : 1, gained: lcd.phase === 'rounds' ? bonus.gained : 0, premium: !!(lcd.plan ? lcd.plan.premium : bonus.premium) } : (pendingLoaded && pendingLoaded.bonus ? pendingLoaded.bonus : null),
+        bonus: (lcd.phase === 'intro' || lcd.phase === 'rounds') ? { round: lcd.phase === 'rounds' ? bonus.round : 1, gained: lcd.phase === 'rounds' ? bonus.gained : 0, premium: !!(lcd.plan ? lcd.plan.premium : bonus.premium), sym: bonus.sym | 0 } : (pendingLoaded && pendingLoaded.bonus ? pendingLoaded.bonus : null),
       },
       state: { have: s.have + (playing ? balls.length : 0), shot: s.shot, hit: s.hit, out: s.out, spins: s.spins, wins: s.wins, plays: s.plays, maxHave: s.maxHave },
     }));
@@ -1243,7 +1306,7 @@ function saveGame() {
 // 実際の日時で回復を計算（ページを閉じている間も進む。上限中は進めない）
 function tickCoins() {
   const now = Date.now();
-  if (save.coins >= COIN.max) { save.coins = COIN.max; save.nextAt = null; return; }
+  if (save.coins >= COIN.max) { save.nextAt = null; return; }
   if (!save.nextAt) save.nextAt = now + COIN.recoverMs;
   while (save.coins < COIN.max && now >= save.nextAt) { save.coins++; save.nextAt += COIN.recoverMs; }
   if (save.coins >= COIN.max) save.nextAt = null;
@@ -1273,7 +1336,10 @@ function renderMenu() {
     }
     if (save.coins <= 0) h += '<div class="free" style="color:#ffb0b0">ボンコインがないよ。回復を待ってね。</div>';
   }
+  const dot = n => n > 0 ? `<span class="dot">${n > 9 ? '9+' : n}</span>` : '';
+  h += `<div class="subrow"><button id="mDex">📖 図鑑</button><button id="mMis">🎯 ミッション${dot(claimCount())}</button><button id="mGacha">🎁 応援ガチャ${gachaReady() ? '<span class="dot">!</span>' : ''}</button><button id="mQuiz">🧠 ボンクイズ${dot(quizLeft())}</button></div>`;
   $('menuBtns').innerHTML = h;
+  $('mDex').onclick = () => openDex(); $('mMis').onclick = () => openMissions(); $('mGacha').onclick = openGacha; $('mQuiz').onclick = openQuiz;
   $('menuRec').innerHTML = `遊技記録：遊技 ${state.plays}回 ／ 打った玉 ${state.shot} ／ 入賞 ${state.hit} ／ 通常回転 ${state.spins} ／ 大当たり ${state.wins}回 ／ 最高持ち玉 ${state.maxHave}`;
   const rb = $('menuBtns').querySelector('#mResume'); if (rb) rb.onclick = () => beginPlay(false);
   $('menuBtns').querySelectorAll('[data-rate]').forEach(b => b.onclick = () => {
@@ -1290,11 +1356,12 @@ function beginPlay() {
     const pd = pendingLoaded; pendingLoaded = null;
     state.queue = (pd.cur ? [pd.cur] : []).concat(pd.queue || []);
     lcd.phase = 'idle'; lcd.res = null; lcd.plan = null;
-    if (pd.bonus) startRounds(pd.bonus.round, pd.bonus.gained, pd.bonus.premium); else startNextSpin();
+    if (pd.bonus) startRounds(pd.bonus.round, pd.bonus.gained, pd.bonus.premium, pd.bonus.sym); else startNextSpin();
   } else {
     if (lcd.phase === 'rounds') bgmPlay(bonus.premium ? 'premium' : 'bonus');
     if (lcd.phase === 'idle') startNextSpin();
   }
+  if (supportOn()) setSide('R');
   saveGame(); $('menu').classList.remove('show'); $('empty').classList.remove('show'); toast(RATES[save.rate].label + ' スタート！');
 }
 
@@ -1346,7 +1413,277 @@ tShow(tIdx, false); tRestart();
 setInterval(() => { if (playing) saveGame(); }, 3000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
 window.addEventListener('pagehide', saveGame);
-loadGame(); renderMenu();
+/* ============================================================
+   ボンコイン拡張（ログボ・ミッション・応援ガチャ・ボンクイズ）と図鑑
+   すべて無料。課金・換金・広告なし。
+   ============================================================ */
+const BON_ART = ['red', 'yellow', 'blue', 'green', 'purple', 'pink', 'rainbow'];   // SYMBOLS順（おこ・にこ・ひょえ・もぐ・ねむ・てれ・にじ）
+const bonArt = i => TITLE_ART[BON_ART[i]];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+(function subCss() {
+  const st = document.createElement('style');
+  st.textContent = `
+  #subBox h2 { text-align: center; }
+  .subrow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+  .subrow button { position: relative; min-height: 40px; font-size: 13px; }
+  .subrow .dot { position: absolute; right: 4px; top: -5px; background: #ff3d6e; color: #fff; border-radius: 9px; font-size: 10px; padding: 0 5px; line-height: 16px; }
+  .tabs { display: flex; gap: 4px; margin: 8px 0; }
+  .tabs button { min-height: 30px; font-size: 12px; padding: 2px 0; }
+  .grid7 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .gc { background: rgba(255,255,255,.75); border: 1px solid #d3b062; border-radius: 10px; padding: 4px 2px; text-align: center; font-size: 10px; color: #6b4b00; line-height: 1.25; }
+  .gc.lock { opacity: .75; } .gc b { display: block; font-size: 11px; color: #3b2a00; }
+  .gc .art { height: 86px; display: flex; align-items: flex-end; justify-content: center; }
+  .gc .art img { max-height: 100%; max-width: 100%; object-fit: contain; }
+  .gc .art img.sil { filter: brightness(0) opacity(.28); }
+  .gc .sy { height: 38px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; }
+  .gc .sy img { height: 36px; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 5px 2px; border-bottom: 1px dashed #d9bf7a; font-size: 12px; color: #3b2a00; font-weight: 700; }
+  .row small { display: block; color: #8a6a30; font-weight: 600; font-size: 10px; }
+  .row button { flex: none; min-width: 74px; min-height: 30px; font-size: 12px; padding: 2px 6px; }
+  .bar { height: 6px; background: #ead9a6; border-radius: 3px; overflow: hidden; margin-top: 3px; } .bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffb74d, #ff8a00); }
+  .ldrow { display: flex; justify-content: center; gap: 5px; margin: 10px 0 2px; }
+  .ld { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #c9972b; display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 900; color: #b89a4a; background: #fffbe8; }
+  .ld.on { background: linear-gradient(#ffd45a, #ff9a00); color: #fff; border-color: #b86a00; }
+  .qchoice { display: block; width: 100%; text-align: left; margin-top: 7px; padding: 9px 10px; font-size: 14px; min-height: 44px; }
+  .qchoice.ok { background: linear-gradient(#b9f6ca, #43c06d); color: #07391a; } .qchoice.ng { background: linear-gradient(#ffc9c9, #f26b6b); color: #4a0000; }
+  .sec { font-size: 12px; font-weight: 900; color: #9a5a00; margin: 10px 0 2px; }
+  `; document.head.appendChild(st);
+})();
+const subOv = document.createElement('div'); subOv.className = 'ov'; subOv.id = 'subOv'; subOv.style.zIndex = 120;
+subOv.innerHTML = '<div class="box" id="subBox" style="width:min(94vw,440px);text-align:left"></div>';
+document.body.appendChild(subOv);
+function openSub(html) { const b = document.getElementById('subBox'); b.innerHTML = html; subOv.classList.add('show'); b.scrollTop = 0; bindClose(); }
+function bindClose() { document.querySelectorAll('#subBox [data-close]').forEach(e => { e.onclick = closeSub; }); }
+function closeSub() { subOv.classList.remove('show'); if ($('menu').classList.contains('show')) renderMenu(); }
+subOv.addEventListener('click', e => { if (e.target === subOv) closeSub(); });
+const closeBtn = '<button class="big" data-close="1">閉じる</button>';
+const addCoins = n => { save.coins += n; saveGame(); };
+
+/* ---------- 毎日ログインボーナス ---------- */
+function loginCheck() {
+  const t = todayKey(); if (G.login.last === t) return null;
+  const y = todayKey(new Date(Date.now() - 864e5));
+  G.login.streak = G.login.last === y ? G.login.streak + 1 : 1; G.login.last = t; G.login.total++;
+  const reward = G.login.streak % 7 === 0 ? 2 : 1; save.coins += reward; saveGame();
+  return { streak: G.login.streak, reward };
+}
+function showLogin(r) {
+  const day = ((r.streak - 1) % 7) + 1; let dots = '';
+  for (let i = 1; i <= 7; i++) dots += `<i class="ld ${i <= day ? 'on' : ''}">${i === 7 ? '★' : i}</i>`;
+  openSub(`<h2 style="font-size:22px">ログインボーナス</h2><div class="cc" style="text-align:center">連続 ${r.streak} 日目！</div><div class="ldrow">${dots}</div>
+  <div style="text-align:center;font-weight:900;font-size:22px;margin:12px 0 4px">🪙 ボンコイン +${r.reward}</div>
+  <div style="text-align:center;font-size:11px;color:#8a6a30">7日目はボーナスが2枚になるよ</div><button class="big go" data-close="1">やったー！</button>`);
+}
+
+/* ---------- デイリーミッション・実績 ---------- */
+const DAILY = [
+  { id: 'shot', label: '玉を100発打つ', goal: 100 }, { id: 'hit', label: '入賞を30回する', goal: 30 },
+  { id: 'spin', label: '50回転させる', goal: 50 }, { id: 'win', label: '大当たりを1回引く', goal: 1 }, { id: 'den', label: '電チューに5回入賞', goal: 5 },
+];
+const dexCount = () => ['yk', 'rc', 'sp'].reduce((a, k) => a + Object.values(G.dex[k]).filter(v => v > 0).length, 0);
+const DEX_TOTAL = () => Object.keys(YOKOKU).length + Object.keys(REACHES).length + Object.keys(SP_DEX).length;
+const bonCount = () => [0, 1, 2, 3, 4, 5, 6].filter(bonOpen).length;
+const bonOpen = i => (G.dex.bon[i] || 0) > 0 || (G.gacha.cards[i] || 0) > 0 || (G.dex.sym[7 + i] || 0) > 0;
+const ACH = [
+  { id: 'first', label: '初めての大当たり', ok: () => state.wins >= 1, r: 1 },
+  { id: 'shot1000', label: '玉を累計1000発打つ', ok: () => state.shot >= 1000, r: 1, prog: () => [state.shot, 1000] },
+  { id: 'bon3', label: 'ボン図鑑を3人解放', ok: () => bonCount() >= 3, r: 1, prog: () => [bonCount(), 3] },
+  { id: 'bon7', label: 'ボン図鑑を全員解放', ok: () => bonCount() >= 7, r: 3, prog: () => [bonCount(), 7] },
+  { id: 'dex10', label: '演出図鑑を10個解放', ok: () => dexCount() >= 10, r: 1, prog: () => [dexCount(), 10] },
+  { id: 'dexall', label: '演出図鑑をコンプリート', ok: () => dexCount() >= DEX_TOTAL(), r: 3, prog: () => [dexCount(), DEX_TOTAL()] },
+  { id: 'kaku', label: '確変に突入する', ok: () => G.rec.kaku >= 1, r: 1 },
+  { id: 'chain3', label: '3連チャンする', ok: () => G.rec.bestChain >= 3, r: 2, prog: () => [G.rec.bestChain, 3] },
+  { id: 'seven', label: '7揃いで大当たり', ok: () => G.rec.seven >= 1, r: 2 },
+  { id: 'prem', label: 'プレミアム演出で大当たり', ok: () => G.rec.premium >= 1, r: 3 },
+  { id: 'quiz5', label: 'ボンクイズに5問正解', ok: () => G.rec.quizOk >= 5, r: 1, prog: () => [G.rec.quizOk, 5] },
+  { id: 'quiz30', label: 'ボンクイズに30問正解', ok: () => G.rec.quizOk >= 30, r: 3, prog: () => [G.rec.quizOk, 30] },
+];
+function claimCount() {
+  dailyCheck();
+  return DAILY.filter(d => (G.daily.m[d.id] || 0) >= d.goal && !G.daily.claimed[d.id]).length + ACH.filter(a => a.ok() && !G.ach[a.id]).length;
+}
+function openMissions(msg) {
+  dailyCheck();
+  let h = `<h2 style="font-size:22px">🎯 ミッション</h2>${msg ? `<div style="text-align:center;font-weight:900;color:#c76a00">${msg}</div>` : ''}<div class="sec">きょうのミッション（毎日リセット・1つ🪙1枚）</div>`;
+  for (const d of DAILY) {
+    const v = Math.min(d.goal, G.daily.m[d.id] || 0), done = v >= d.goal, got = G.daily.claimed[d.id];
+    h += `<div class="row"><div style="flex:1">${d.label}<small>${v} / ${d.goal}</small><div class="bar"><i style="width:${v / d.goal * 100}%"></i></div></div>
+      <button ${done && !got ? 'class="on"' : 'disabled'} data-d="${d.id}">${got ? '受け取り済' : done ? '🪙 受け取る' : '挑戦中'}</button></div>`;
+  }
+  h += '<div class="sec">じっせき（一度きり）</div>';
+  for (const a of ACH) {
+    const ok = a.ok(), got = G.ach[a.id], pr = a.prog ? a.prog() : null;
+    h += `<div class="row"><div style="flex:1">${a.label}<small>${pr ? Math.min(pr[0], pr[1]) + ' / ' + pr[1] + '　' : ''}ごほうび 🪙${a.r}枚</small></div>
+      <button ${ok && !got ? 'class="on"' : 'disabled'} data-a="${a.id}">${got ? '受け取り済' : ok ? '🪙 受け取る' : '未達成'}</button></div>`;
+  }
+  openSub(h + closeBtn);
+  document.querySelectorAll('#subBox [data-d]').forEach(b => b.onclick = () => {
+    dailyCheck(); const d = DAILY.find(x => x.id === b.dataset.d); if (!d || (G.daily.m[d.id] || 0) < d.goal || G.daily.claimed[d.id]) return;
+    G.daily.claimed[d.id] = 1; addCoins(1); openMissions('🪙 ボンコイン +1！');
+  });
+  document.querySelectorAll('#subBox [data-a]').forEach(b => b.onclick = () => {
+    const a = ACH.find(x => x.id === b.dataset.a); if (!a || !a.ok() || G.ach[a.id]) return;
+    G.ach[a.id] = 1; addCoins(a.r); openMissions(`🪙 ボンコイン +${a.r}！`);
+  });
+}
+
+/* ---------- 応援ガチャ（1日1回・コイン消費なし） ---------- */
+const CHEER = [
+  'べ、別に心配してるわけじゃないんだからね！……でも、がんばんなさいよ。アタシがついてるんだから！',
+  'わたしも応援してるよ！いっしょにたのしもうね〜！',
+  'あわわ、ドキドキするけど……ボン、おうえんしてるよ！だいじょうぶ！',
+  'うち、おにぎり持って応援するよ〜！おなかいっぱい当たるといいね〜！',
+  'ぼく、ねむいけど……おうえんしてる。……ぐぅ。',
+  'わ、私の応援でよければ……が、がんばってください……っ！',
+  'うむ！よく聞けい！　我輩がついておるのだぞ。わっはっは！',
+];
+function gachaReady() { return G.gacha.date !== todayKey(); }
+function openGacha() {
+  if (!gachaReady()) {
+    openSub(`<h2 style="font-size:22px">🎁 応援ガチャ</h2><p style="text-align:center;font-weight:800;margin:12px 0">きょうはもう引いたよ。<br>また明日、応援に来てもらおう！</p><div style="text-align:center;font-size:11px;color:#8a6a30">集めた応援カードは 図鑑 → ボン で見られるよ</div>${closeBtn}`);
+    return;
+  }
+  openSub(`<h2 style="font-size:22px">🎁 応援ガチャ</h2><p style="text-align:center;font-weight:800;margin:10px 0">1日1回、むりょうで引けるよ。<br>ボンちゃんが応援に来てくれる！</p><button class="big go" id="gGo">ガチャを引く</button>${closeBtn}`);
+  document.getElementById('gGo').onclick = () => {
+    const w = [16, 16, 16, 16, 16, 16, 4]; let r = Math.random() * 100, i = 0; for (; i < 7; i++) { if ((r -= w[i]) < 0) break; } i = Math.min(i, 6);
+    G.gacha.date = todayKey(); G.gacha.cards[i] = (G.gacha.cards[i] || 0) + 1; G.rec.gacha++; saveGame();
+    const n = G.gacha.cards[i];
+    openSub(`<h2 style="font-size:22px">${i === 6 ? '🌈 レアカード！' : '🎁 応援カード'}</h2><div style="text-align:center"><img src="${bonArt(i)}" alt="" style="max-height:200px;max-width:60%;object-fit:contain"></div>
+      <div style="text-align:center;font-weight:900;font-size:17px;margin-top:4px">${SYMBOL_NAMES[i]}</div>
+      <p style="background:#fffbe8;border:2px solid #e0b84a;border-radius:12px;padding:8px 10px;font-weight:800;line-height:1.6;margin:8px 0">「${esc(CHEER[i])}」</p>
+      <div style="text-align:center;font-size:11px;color:#8a6a30">${n === 1 ? '新しいカードをゲット！' : `${n}枚目のカード`}　（明日また引けるよ）</div>${closeBtn}`);
+  };
+}
+
+/* ---------- ボンクイズ（1日3回まで・正解でボンコイン1枚） ---------- */
+const QUIZ_PER_DAY = 3;
+const Q = (q, a, n) => ({ q, a, n });   // aの先頭が正解
+const QUIZ = [
+  Q('おこボンの一人称は？', ['アタシ', 'わたし', 'うち', 'ぼく'], 'おこボンは「アタシ」。強気なタメ口で話すよ。'),
+  Q('にこボンの好きな食べ物は？', ['ポテト', 'オムライス', 'おにぎり', 'ホットミルク'], 'にこボンはポテトが好き。'),
+  Q('ひょえボンの好きな食べ物は？', ['おにぎり', 'ポテト', 'オムライス', '辛いもの'], 'ひょえボンはおにぎり好き。'),
+  Q('ねむボンの好きな飲み物は？', ['ホットミルク', 'ココア', 'りんごジュース', '緑茶'], 'ねむボンはホットミルクが好き。'),
+  Q('てれボンの好きな食べ物は？', ['オムライス', 'ポテト', 'ラーメン', 'ハンバーグ'], 'てれボンはオムライス好き。'),
+  Q('辛いものが好きなボンは？', ['おこボン', 'にこボン', 'ひょえボン', 'ねむボン'], '辛いもの好きはおこボン。'),
+  Q('ペロペロキャンディが好きなボンは？', ['にじボン', 'もぐボン', 'てれボン', 'にこボン'], 'にじボンはペロペロキャンディが好き。'),
+  Q('ボンたち全員が大好きな食べ物は？', ['お赤飯', 'カレー', 'ラーメン', 'ケーキ'], 'ボンちゃんはみんなお赤飯が大好き！'),
+  Q('ボンちゃんの正体は？', ['人間の想像力から生まれた精霊', '森に住む妖怪', '宇宙から来た宇宙人', 'ぬいぐるみの付喪神'], 'ボンちゃんは、人間の想像力から生まれた精霊だよ。'),
+  Q('びっくりしたときのボンの口ぐせは？', ['ボン！？', 'ワン！？', 'ええっ！？', 'うひゃあ！？'], 'びっくりしたときは「ボン！？」。'),
+  Q('ごはんを食べるときのボンの声は？', ['ボーン！', 'パクッ！', 'ぺろり！', 'ごちそう！'], 'ごはんのときは「ボーン！」。'),
+  Q('しょんぼりしたときのボンの言葉は？', ['しょボン……', 'がっくり……', 'とほほ……', 'しくしく……'], 'しょんぼりは「しょボン……」。'),
+  Q('「うむ！」「よく聞けい！」が口ぐせのボンは？', ['にじボン', 'おこボン', 'ねむボン', 'てれボン'], 'にじボンの口ぐせだよ。「わっはっは！」も言う。'),
+  Q('にじボンの髪の色は？', ['白', '虹色', '黒', '水色'], '髪は白。服やリュックが虹色なんだよ。'),
+  Q('シリーズでいちばん最年少で小柄なボンは？', ['ひょえボン', 'にこボン', 'もぐボン', 'ねむボン'], '最年少でいちばん小柄なのはひょえボン。'),
+  Q('シリーズでいちばん最年長のボンは？', ['にじボン', 'おこボン', 'もぐボン', 'てれボン'], '最年長はにじボン。少し成長した姿だよ。'),
+  Q('趣味が「詩を書くこと」のボンは？', ['てれボン', 'ねむボン', 'にこボン', 'ひょえボン'], 'てれボンは詩を書くのが趣味。'),
+  Q('趣味が「畑づくり」のボンは？', ['もぐボン', 'おこボン', 'にこボン', 'ねむボン'], 'もぐボンは畑づくりが趣味。'),
+  Q('「夢の日記」を書いているボンは？', ['ねむボン', 'てれボン', 'にじボン', 'ひょえボン'], 'ねむボンは夢の日記をつけているよ。'),
+  Q('こっそり裁縫・手芸が趣味のボンは？', ['ひょえボン', 'てれボン', 'おこボン', 'もぐボン'], 'ひょえボンはこっそり手芸をしているよ。'),
+  Q('歌とダンスが趣味のボンは？', ['にこボン', 'おこボン', 'ねむボン', 'もぐボン'], 'にこボンは歌とダンスが得意。'),
+  Q('ひょえボンがこわがるボンは？', ['おこボン', 'にこボン', 'ねむボン', 'もぐボン'], 'ひょえボンはおこボンがこわいんだって。'),
+  Q('おこボンがライバル視しているボンは？', ['もぐボン', 'にこボン', 'てれボン', 'ねむボン'], 'おこボンはもぐボンを一方的にライバル視。'),
+  Q('仲直りの名人と呼ばれるボンは？', ['にこボン', 'おこボン', 'ひょえボン', 'もぐボン'], 'にこボンは仲直りの名人！'),
+  Q('おこボンが苦手なことは？', ['ほめられること', '辛いもの', 'かけっこ', '朝おき'], 'おこボンは、ほめられるのが苦手。'),
+  Q('おこボンの習性は？', ['朝型', '夜型', '昼寝が長い', 'ずっと歌っている'], 'おこボンは朝型だよ。'),
+  Q('料理が得意なボンは？', ['もぐボン', 'おこボン', 'ひょえボン', 'ねむボン'], 'もぐボンは料理が得意。'),
+  Q('虹を出すのが得意なボンは？', ['にじボン', 'もぐボン', 'ひょえボン', 'ねむボン'], 'にじボンは虹を出せるよ。'),
+  Q('寝かしつけが得意なボンは？', ['ねむボン', 'おこボン', 'にこボン', 'もぐボン'], 'ねむボンは寝かしつけが得意。'),
+  Q('かくれんぼが得意なボンは？', ['てれボン', 'おこボン', 'もぐボン', 'にじボン'], 'てれボンはかくれんぼが得意。'),
+  Q('にげ足が得意なボンは？', ['ひょえボン', 'おこボン', 'にこボン', 'もぐボン'], 'ひょえボンはにげ足が速いよ。'),
+  Q('一人称が「うち」のボンは？', ['もぐボン', 'ひょえボン', 'てれボン', 'ねむボン'], 'もぐボンは「うち」。'),
+  Q('一人称が「ぼく」のボンは？', ['ねむボン', 'おこボン', 'にこボン', 'もぐボン'], 'ねむボンは「ぼく」。'),
+  Q('てれボンの一人称は？', ['私', 'アタシ', 'ボン', '我輩'], 'てれボンは「私」。'),
+  Q('にじボンの一人称は？', ['我輩', 'ぼく', 'うち', 'アタシ'], 'にじボンは「我輩」。'),
+  Q('ひょえボンの一人称は？', ['ボン', 'あたち', 'アタシ', 'わたし'], 'ひょえボンは「ボン」と言うよ。'),
+  Q('にこボンの一人称は？', ['わたし', 'アタシ', 'うち', '私'], 'にこボンは「わたし」。'),
+  Q('にこボンと特に仲よしなボンは？', ['にじボン', 'おこボン', 'もぐボン', 'ねむボン'], 'にじボンとにこボンは特に仲よし。'),
+  Q('ひょえボンと一緒にいると安心できるボンは？', ['ねむボン', 'おこボン', 'にじボン', 'もぐボン'], 'ひょえボンとねむボンは安心できる二人。'),
+  Q('ピンクのボンは？', ['てれボン', 'にこボン', 'おこボン', 'ねむボン'], 'ピンクはてれボン。'),
+  Q('紫のボンは？', ['ねむボン', 'てれボン', 'ひょえボン', 'もぐボン'], '紫はねむボン。'),
+  Q('緑のボンは？', ['もぐボン', 'にこボン', 'ひょえボン', 'おこボン'], '緑はもぐボン。'),
+  Q('ボンちゃんのカチューシャに書いてある文字は？', ['BON', 'UTOPIA', 'LOVE', 'DREAM'], 'カチューシャには「BON」と書いてあるよ。'),
+  Q('BON UTOPIA のキャッチコピーは？', ['夢も、希望も、大当たりも！', '笑顔も、勇気も、大当たりも！', '夢も、愛も、ボンも！', '今日も、明日も、大当たり！'], 'キャッチコピーは「夢も、希望も、大当たりも！」。'),
+];
+let quizCur = null;
+function quizState() { const t = todayKey(); if (G.quiz.date !== t) G.quiz = { date: t, count: 0, ok: 0, asked: [] }; return G.quiz; }
+const quizLeft = () => Math.max(0, QUIZ_PER_DAY - quizState().count);
+function openQuiz() {
+  const S = quizState();
+  if (S.count >= QUIZ_PER_DAY) {
+    openSub(`<h2 style="font-size:22px">🧠 ボンクイズ</h2><p style="text-align:center;font-weight:800;margin:12px 0">きょうの3問は おしまい！<br>（正解 ${S.ok} / ${S.count}）<br>また明日、挑戦してね。</p>${closeBtn}`);
+    return;
+  }
+  let pool = QUIZ.map((_, i) => i).filter(i => !S.asked.includes(i)); if (!pool.length) pool = QUIZ.map((_, i) => i);
+  const idx = pool[Math.floor(Math.random() * pool.length)], q = QUIZ[idx];
+  const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+  quizCur = { idx, order, done: false };
+  let h = `<h2 style="font-size:22px">🧠 ボンクイズ</h2><div style="text-align:center;font-size:11px;color:#8a6a30">きょう ${S.count + 1} 問目 / ${QUIZ_PER_DAY}問　正解で🪙1枚</div>
+    <p style="font-weight:900;font-size:16px;margin:10px 0 4px;line-height:1.5">${esc(q.q)}</p>`;
+  order.forEach((o, k) => { h += `<button class="qchoice" data-k="${k}">${'ABCD'[k]}　${esc(q.a[o])}</button>`; });
+  openSub(h + '<button class="big" data-close="1" style="margin-top:12px">あとでやる</button>');
+  document.querySelectorAll('#subBox .qchoice').forEach(b => b.onclick = () => answerQuiz(+b.dataset.k));
+}
+function answerQuiz(k) {
+  if (!quizCur || quizCur.done) return; quizCur.done = true;
+  const S = quizState(), q = QUIZ[quizCur.idx], right = quizCur.order[k] === 0;
+  S.count++; S.asked.push(quizCur.idx); G.rec.quizAll++;
+  if (right) { S.ok++; G.rec.quizOk++; save.coins += 1; }
+  saveGame();
+  document.querySelectorAll('#subBox .qchoice').forEach((b, i) => { b.disabled = true; if (quizCur.order[i] === 0) b.classList.add('ok'); else if (i === k) b.classList.add('ng'); });
+  const left = quizLeft();
+  const res = document.createElement('div');
+  res.innerHTML = `<div style="text-align:center;font-weight:900;font-size:20px;margin:12px 0 2px;color:${right ? '#1d8a3f' : '#c0392b'}">${right ? '⭕ 正解！ 🪙+1' : '❌ ざんねん……'}</div>
+    <div style="background:#fffbe8;border:2px solid #e0b84a;border-radius:10px;padding:7px 9px;font-size:12px;font-weight:700;line-height:1.6">${esc(q.n)}</div>
+    <button class="big go" id="qNext">${left > 0 ? `つぎの問題へ（あと${left}問）` : '今日はおしまい'}</button>${closeBtn}`;
+  document.getElementById('subBox').appendChild(res); bindClose();
+  document.getElementById('qNext').onclick = () => left > 0 ? openQuiz() : closeSub();
+  document.getElementById('subBox').scrollTop = 99999;
+}
+
+/* ---------- 図鑑 ---------- */
+const SP_DEX = { win: '大当たり', premium: 'プレミアム大当たり', seven: '7揃い大当たり', kaku: '確変突入', jitan: '時短突入', den: '電チュー入賞' };
+let dexTab = 'bon';
+function openDex(tab) {
+  if (tab) dexTab = tab;
+  const tabs = [['bon', 'ボン'], ['sym', '図柄'], ['fx', '演出'], ['rec', '記録']];
+  let h = `<h2 style="font-size:22px">📖 図鑑</h2><div class="tabs">${tabs.map(([k, n]) => `<button data-t="${k}" class="${k === dexTab ? 'on' : ''}">${n}</button>`).join('')}</div>`;
+  if (dexTab === 'bon') {
+    h += `<div style="font-size:11px;color:#8a6a30;margin-bottom:6px">解放 ${bonCount()} / 7　（演出で登場・図柄で大当たり・応援ガチャで会えると解放）</div><div class="grid7">`;
+    for (let i = 0; i < 7; i++) {
+      const open = bonOpen(i), c = G.gacha.cards[i] || 0;
+      h += `<div class="gc ${open ? '' : 'lock'}"><div class="art"><img src="${bonArt(i)}" alt="" class="${open ? '' : 'sil'}"></div><b>${open ? SYMBOL_NAMES[i] : '？？？'}</b>${open ? `応援カード ${c}枚<br>当てた回数 ${G.dex.sym[7 + i] || 0}` : 'ひみつ'}</div>`;
+    }
+    h += '</div>';
+  } else if (dexTab === 'sym') {
+    const seen = Object.keys(G.dex.symSeen).length, hit = Object.values(G.dex.sym).filter(v => v > 0).length;
+    h += `<div style="font-size:11px;color:#8a6a30;margin-bottom:6px">見た ${seen} / ${SYM_DEFS.length}　当てた ${hit} / ${SYM_DEFS.length}</div><div class="grid7" style="grid-template-columns:repeat(4,1fr)">`;
+    SYM_DEFS.forEach((d, i) => {
+      const hitN = G.dex.sym[i] || 0, sn = G.dex.symSeen[i];
+      let ico = d.kind === 'bon' ? `<img src="${BON_IMG[SYMBOLS[d.bon]]}" alt="">` : d.kind === 'star' ? '★' : d.kind === 'fever' ? '🔥' : esc(d.label);
+      const col = d.kind === 'num' ? NUMCOL[+d.label - 1] : '#d99a00';
+      h += `<div class="gc ${hitN ? '' : 'lock'}"><div class="sy" style="color:${hitN ? col : '#bbb'};${sn || hitN ? '' : 'filter:brightness(0) opacity(.25)'}">${ico}</div><b>${sn || hitN ? esc(d.label) : '？'}</b>${hitN ? `当たり ${hitN}回` : sn ? '見た' : '未'}</div>`;
+    });
+    h += '</div>';
+  } else if (dexTab === 'fx') {
+    h += `<div style="font-size:11px;color:#8a6a30;margin-bottom:4px">解放 ${dexCount()} / ${DEX_TOTAL()}　（見た回数つき）</div>`;
+    const sec = (title, obj, kind, nameOf) => {
+      h += `<div class="sec">${title}</div>`;
+      for (const k of Object.keys(obj)) { const n = G.dex[kind][k] || 0; h += `<div class="row"><div>${n ? esc(nameOf(obj[k])) : '？？？？？'}${n && obj[k].tier !== undefined ? `<small>${TIER[obj[k].tier]}</small>` : ''}</div><div>${n ? n + '回' : '未'}</div></div>`; }
+    };
+    sec('予告演出', YOKOKU, 'yk', o => o.name); sec('リーチ演出', REACHES, 'rc', o => o.name); sec('大当たり・状態', SP_DEX, 'sp', o => o);
+  } else {
+    const r = G.rec, rows = [
+      ['遊技回数', state.plays], ['打った玉', state.shot], ['入賞', state.hit], ['通常回転', state.spins], ['大当たり', state.wins], ['最高持ち玉', state.maxHave],
+      ['最大連チャン', r.bestChain], ['確変突入', r.kaku], ['時短突入', r.jitan], ['7揃い', r.seven], ['プレミアム', r.premium], ['電チュー入賞', r.den],
+      ['応援ガチャ', r.gacha], ['クイズ正解', `${r.quizOk} / ${r.quizAll}`], ['ログイン日数', G.login.total], ['連続ログイン', G.login.streak + '日'],
+    ];
+    h += rows.map(([a, b]) => `<div class="row"><div>${a}</div><div>${b}</div></div>`).join('');
+  }
+  openSub(h + closeBtn);
+  document.querySelectorAll('#subBox [data-t]').forEach(b => b.onclick = () => openDex(b.dataset.t));
+}
+
+loadGame(); const __lr = loginCheck(); renderMenu(); if (__lr) showLogin(__lr);
 
 /* ---------- メインループ ---------- */
 let last = performance.now(), acc = 0;
