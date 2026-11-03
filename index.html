@@ -333,6 +333,98 @@ function wpick(keys, wf) {
   const tot = keys.reduce((a, k) => a + wf(k), 0); if (tot <= 0) return keys[0];
   let r = Math.random() * tot; for (const k of keys) { if ((r -= wf(k)) < 0) return k; } return keys[keys.length - 1];
 }
+/* ---------- カスタムのパーツ（ガチャで解放）。見た目だけを変える。抽選・当たりやすさには一切関係しない ---------- */
+const PARTS = {
+  7: { kind: 'hold', key: 'star', name: 'ほし保留', desc: '保留ランプが星になる' },
+  8: { kind: 'hold', key: 'heart', name: 'ハート保留', desc: '保留ランプがハートになる' },
+  9: { kind: 'hold', key: 'gem', name: 'ジェム保留', desc: '保留ランプが宝石になる' },
+  10: { kind: 'hold', key: 'ring', name: 'リング保留', desc: '保留ランプがリングになる' },
+  11: { kind: 'hold', key: 'bon', name: 'ボンちゃん保留', desc: '保留ランプがちいさなボンちゃんになる' },
+  12: { kind: 'fx', key: 'sakura', name: 'さくら予告', desc: '予告にさくらの花びらが舞う' },
+  13: { kind: 'fx', key: 'neon', name: 'ネオン予告', desc: '予告にネオンの光が走る' },
+  14: { kind: 'fx', key: 'stars', name: 'ほしくず予告', desc: '予告に星くずがきらめく' },
+  15: { kind: 'fx', key: 'gold', name: 'ゴールド予告', desc: '予告に金色の粒が舞い上がる' },
+};
+const PART_RARE = { 6: 1, 11: 1, 15: 1 };
+const CARD_N = 16;
+const GACHA_W = [8, 8, 8, 8, 8, 8, 3, 7, 7, 7, 7, 4, 5, 5, 5, 2];   // 合計100
+function gachaRoll() { let r = Math.random() * 100, i = 0; for (; i < GACHA_W.length; i++) { if ((r -= GACHA_W[i]) < 0) break; } return Math.min(i, GACHA_W.length - 1); }
+const partOwned = key => Object.keys(PARTS).some(id => PARTS[id].key === key && (G.gacha.cards[id] || 0) > 0);
+let custom = { hold: 'dot', fx: 'none', ykChar: 'auto', yk: {} };
+try { const sv = JSON.parse(localStorage.getItem('bonutopia_custom') || 'null'); if (sv && typeof sv === 'object') custom = Object.assign(custom, sv); } catch (e) {}
+const saveCustom = () => { try { localStorage.setItem('bonutopia_custom', JSON.stringify(custom)); } catch (e) {} };
+const holdDesign = () => (custom.hold === 'dot' || partOwned(custom.hold)) ? custom.hold : 'dot';
+const fxDesign = () => (custom.fx !== 'none' && partOwned(custom.fx)) ? custom.fx : 'none';
+const holdBonImg = {};
+function holdBonSprite(i) { if (!holdBonImg[i]) { const im = new Image(); im.src = bonArt(i); holdBonImg[i] = im; } return holdBonImg[i]; }
+function holdPath(c, d, x, y, r) {
+  c.beginPath();
+  if (d === 'star') { for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.48 : r * 1.15; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); }
+  else if (d === 'heart') { const k = r / 7; c.moveTo(x, y + 7 * k); c.bezierCurveTo(x - 11 * k, y - 0.5 * k, x - 6.5 * k, y - 9 * k, x, y - 3.5 * k); c.bezierCurveTo(x + 6.5 * k, y - 9 * k, x + 11 * k, y - 0.5 * k, x, y + 7 * k); c.closePath(); }
+  else if (d === 'gem') { c.moveTo(x - r * 0.55, y - r * 0.9); c.lineTo(x + r * 0.55, y - r * 0.9); c.lineTo(x + r * 1.05, y - r * 0.15); c.lineTo(x, y + r * 1.1); c.lineTo(x - r * 1.05, y - r * 0.15); c.closePath(); }
+  else c.arc(x, y, r, 0, 7);
+}
+function drawHoldShape(c, d, x, y, col, k, has) {
+  const BONI = { blue: 2, green: 3, red: 0, rainbow: 6 };
+  if (d === 'ring') {
+    c.beginPath(); c.arc(x, y, 6, 0, 7);
+    if (has) { c.strokeStyle = col; c.lineWidth = 4; c.shadowColor = col; c.shadowBlur = 8; c.stroke(); c.shadowBlur = 0; c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y, 8.2, 0, 7); c.stroke(); }
+    else { c.strokeStyle = 'rgba(255,255,255,.2)'; c.lineWidth = 4; c.stroke(); }
+    return;
+  }
+  if (d === 'bon') {
+    if (has) {
+      const im = holdBonSprite(BONI[k] != null ? BONI[k] : 2);
+      c.beginPath(); c.arc(x, y, 9, 0, 7); c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0;
+      if (im.complete && im.naturalWidth) { const s = 15, w = im.naturalWidth, h = im.naturalHeight, sc = Math.min(s / w, s / h); c.drawImage(im, x - w * sc / 2, y - h * sc / 2, w * sc, h * sc); }
+      c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 1; c.stroke();
+    } else { c.beginPath(); c.arc(x, y, 9, 0, 7); c.fillStyle = 'rgba(255,255,255,.14)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 1; c.stroke(); }
+    return;
+  }
+  holdPath(c, d, x, y, 7);
+  if (has) { c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0; } else { c.fillStyle = 'rgba(255,255,255,.14)'; c.fill(); }
+  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.stroke();
+}
+const partPrev = {};
+function holdPreview(d) {
+  if (partPrev['h' + d]) return partPrev['h' + d];
+  const ready = d !== 'bon' || [0, 2, 3, 6].every(i => { const im = holdBonSprite(i); return im.complete && im.naturalWidth; });
+  const cv = document.createElement('canvas'); cv.width = 180; cv.height = 44; const c = cv.getContext('2d');
+  c.fillStyle = '#2a1850'; roundRect(c, 0, 0, 180, 44, 10); c.fill();
+  ['blue', 'green', 'red', 'rainbow'].forEach((k, i) => { const col = k === 'rainbow' ? '#ffd24d' : HOLD_COL[k][0]; drawHoldShape(c, d, 24 + i * 44, 22, col, k, true); });
+  return ready ? (partPrev['h' + d] = cv.toDataURL()) : cv.toDataURL();
+}
+function drawYkFx(c, key, tr, dur) {
+  const lx = LCD.x, ly = LCD.y, lw = LCD.w, lh = LCD.h, p = tr / dur;
+  c.save(); c.globalAlpha = Math.max(0, Math.min(1, tr * 4, (dur - tr) * 4)) * (calm ? 0.4 : 0.95);
+  if (key === 'sakura') {
+    for (let n = 0; n < 16; n++) { const y = ly - 10 + ((tr * 80 + n * 47) % (lh + 20)), x = lx + ((n * 61) % lw) + Math.sin(tr * 3 + n) * 14; c.save(); c.translate(x, y); c.rotate(tr * 2 + n); c.fillStyle = n % 3 ? '#ffb3d1' : '#ffe0ec'; c.beginPath(); c.ellipse(0, 0, 6, 3.4, 0, 0, 7); c.fill(); c.restore(); }
+  } else if (key === 'neon') {
+    const y = ly + p * lh; c.lineWidth = 2; c.shadowBlur = calm ? 3 : 12;
+    c.strokeStyle = '#00f0ff'; c.shadowColor = '#00f0ff'; c.beginPath(); c.moveTo(lx, y); c.lineTo(lx + lw, y); c.stroke();
+    c.strokeStyle = '#ff3df0'; c.shadowColor = '#ff3df0'; c.beginPath(); c.moveTo(lx, ly + lh - (y - ly)); c.lineTo(lx + lw, ly + lh - (y - ly)); c.stroke();
+    c.strokeRect(lx + 4, ly + 4, lw - 8, lh - 8);
+  } else if (key === 'stars') {
+    for (let n = 0; n < 18; n++) { const x = lx + ((n * 71) % lw), y = ly + ((n * 43) % lh), a = 0.5 + 0.5 * Math.sin(tr * 8 + n * 1.7), r = 2 + a * 4; c.globalAlpha *= 1; c.fillStyle = n % 2 ? '#fff6a8' : '#bde9ff'; c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * 0.3, y - r * 0.3); c.lineTo(x + r, y); c.lineTo(x + r * 0.3, y + r * 0.3); c.lineTo(x, y + r); c.lineTo(x - r * 0.3, y + r * 0.3); c.lineTo(x - r, y); c.lineTo(x - r * 0.3, y - r * 0.3); c.closePath(); c.fill(); }
+  } else if (key === 'gold') {
+    for (let n = 0; n < 22; n++) { const x = lx + ((n * 53) % lw) + Math.sin(tr * 4 + n) * 6, y = ly + lh - ((tr * 70 + n * 37) % (lh + 20)); c.fillStyle = n % 2 ? '#ffd24d' : '#fff1a8'; c.save(); c.translate(x, y); c.rotate(tr * 5 + n); c.fillRect(-2.5, -2.5, 5, 5); c.restore(); }
+  }
+  c.restore();
+}
+function fxPreview(key) {
+  if (partPrev['f' + key]) return partPrev['f' + key];
+  const cv = document.createElement('canvas'); cv.width = 180; cv.height = 100; const c = cv.getContext('2d');
+  const g = c.createLinearGradient(0, 0, 0, 100); g.addColorStop(0, '#3a2a7a'); g.addColorStop(1, '#14083a'); c.fillStyle = g; c.fillRect(0, 0, 180, 100);
+  c.translate(-LCD.x - (LCD.w - 180) / 2, -LCD.y - (LCD.h - 100) / 2); const wasCalm = calm; calm = false; drawYkFx(c, key, 0.8, 1.6); calm = wasCalm;
+  return (partPrev['f' + key] = cv.toDataURL());
+}
+setTimeout(() => { try { [0, 2, 3, 6].forEach(holdBonSprite); } catch (e) {} }, 800);
+function cardView(i, big) {
+  if (i < 7) return `<div style="text-align:center"><img src="${bonArt(i)}" alt="" style="max-height:${big ? 200 : 150}px;max-width:60%;object-fit:contain"></div><div style="text-align:center;font-weight:900;font-size:${big ? 17 : 15}px;margin-top:4px">${SYMBOL_NAMES[i]}</div><p style="background:#fffbe8;border:2px solid #e0b84a;border-radius:12px;padding:8px 10px;font-weight:800;line-height:1.6;margin:8px 0">「${esc(CHEER[i])}」</p>`;
+  const p = PARTS[i], img = p.kind === 'hold' ? holdPreview(p.key) : fxPreview(p.key);
+  return `<div style="text-align:center"><div style="font-size:11px;font-weight:800;color:#8a5a00">カスタムのパーツ（${p.kind === 'hold' ? '保留' : '予告'}）</div><img src="${img}" alt="" style="width:75%;max-width:260px;border-radius:12px;margin-top:6px"></div><div style="text-align:center;font-weight:900;font-size:${big ? 17 : 15}px;margin-top:6px">${p.name}</div><p style="background:#fffbe8;border:2px solid #e0b84a;border-radius:12px;padding:8px 10px;font-weight:800;line-height:1.6;margin:8px 0;text-align:center">${p.desc}。<br><small>タイトルの「カスタム」で使えるよ</small></p>`;
+}
+
 function planDirection(res) {
   const win = res.win, rnd = Math.random, n = SYM_DEFS.length;
   const P = { win, yokoku: [], reach: null, premium: false, tier: 0, stops: [1.6, 2.6, 3.6], R: 99, M: 3.6, sym: null, chars: [], bg: Math.floor(rnd() * 3), pat: Math.floor(rnd() * 3) };
@@ -350,13 +442,14 @@ function planDirection(res) {
   }
   P.chars = [0, 1, 2, 3, 4, 5, 6].sort(() => rnd() - 0.5);
   if (res.win && res.symIdx >= 7 && res.symIdx <= 13) P.chars[0] = res.symIdx - 7;
+  if (custom.ykChar !== 'auto' && bonOpen(+custom.ykChar)) P.chars = [0, 1, 2, 3, 4, 5, 6].map(() => +custom.ykChar);   // 予告に出るキャラを固定（見た目だけ）
   // 停止タイミング（図柄ごとに別々）
   if (P.reach) { const L = 3.2 + rnd() * 0.4, R = L + 0.9; P.R = R; P.M = R + REACHES[P.reach].dur; P.stops = [L, P.M, R]; }
   else { const a = 3.0 + rnd() * 0.3; P.stops = [a, a + 1.0 + rnd() * 0.3, a + 2.0 + rnd() * 0.4]; P.M = P.stops[2]; }
   // 予告
   const cnt = wpick(['0', '1', '2'], k => DIR_CFG.yokokuCount[win ? 'win' : 'lose'][+k]);
-  const yk = Object.keys(YOKOKU), used = {};
-  for (let i = 0; i < +cnt; i++) {
+  const yk = Object.keys(YOKOKU).filter(k => custom.yk[k] !== false), used = {};   // OFFにした予告は出さない（当たりやすさは変わらない）
+  for (let i = 0; i < +cnt && yk.some(k => !used[k]); i++) {
     const id = wpick(yk.filter(k => !used[k]), k => YOKOKU[k][win ? 'winW' : 'loseW']); used[id] = 1;
     P.yokoku.push({ id, at: 0.6 + i * 2.0 + rnd() * 0.5, theme: 1 + Math.floor(rnd() * 2) });
   }
@@ -584,7 +677,7 @@ function drawSpinScreen(c) {
     c.strokeStyle = (reach && i === 1) ? '#ffd86b' : 'rgba(255,255,255,.35)'; c.lineWidth = (reach && i === 1) ? 3 : 1.5; roundRect(c, bx, by, 64, 78, 8); c.stroke();
   }
   // 予告
-  if (spin && P) P.yokoku.forEach(y => { const tr = t - y.at; if (tr >= 0 && tr <= YOKOKU[y.id].dur) { c.save(); drawYokoku(c, y, tr, YOKOKU[y.id].dur, P); c.restore(); } });
+  if (spin && P) P.yokoku.forEach(y => { const tr = t - y.at; if (tr >= 0 && tr <= YOKOKU[y.id].dur) { c.save(); drawYokoku(c, y, tr, YOKOKU[y.id].dur, P); c.restore(); { const fx = fxDesign(); if (fx !== 'none') drawYkFx(c, fx, tr, YOKOKU[y.id].dur); }; } });
   // リーチ
   if (reach && !lcd.skipped) { c.save(); drawReachScene(c, P.reach, t - P.R, P); c.restore(); }
   // タイトル
@@ -644,13 +737,12 @@ function drawLCD(c) {
   c.fillStyle = '#d8ccff'; c.font = '11px sans-serif'; c.fillText('保留', LCD.x + 46, LCD.y + LCD.h - 12);
   for (let i = 0; i < LOTTERY.holdMax; i++) {
     const hx = LCD.x + 84 + i * 24, hy = LCD.y + LCD.h - 12;
-    c.beginPath(); c.arc(hx, hy, 7, 0, 7);
-    if (i < state.queue.length) {
-      const q = state.queue[i], k = q && q.hc && q.hshow ? q.hc : 'blue';
-      let col = HOLD_COL[k][0]; if (k === 'rainbow') col = calm ? '#ffd24d' : `hsl(${(performance.now() / 6) % 360},100%,60%)`;
-      c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 8; c.fill(); c.shadowBlur = 0;
-    } else { c.fillStyle = 'rgba(255,255,255,.14)'; c.fill(); }
-    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.stroke();
+    const has = i < state.queue.length; let col = '#fff', k = 'blue';
+    if (has) {
+      const q = state.queue[i]; k = q && q.hc && q.hshow ? q.hc : 'blue';
+      col = HOLD_COL[k][0]; if (k === 'rainbow') col = calm ? '#ffd24d' : `hsl(${(performance.now() / 6) % 360},100%,60%)`;
+    }
+    drawHoldShape(c, holdDesign(), hx, hy, col, k, has);
   }
   if (supportOn()) {
     const kk = MODE.k === 'kaku', txt = kk ? `確変 残り${MODE.left}` : `時短 残り${MODE.left}`;
@@ -1407,7 +1499,7 @@ function renderMenu() {
   const dot = n => n > 0 ? `<span class="dot">${n > 9 ? '9+' : n}</span>` : '';
   h += `<div class="subrow"><button id="mDex">📖 図鑑</button><button id="mMis">🎯 ミッション${dot(claimCount())}</button><button id="mGacha">🎁 応援ガチャ${gachaReady() ? '<span class="dot">!</span>' : ''}</button><button id="mQuiz">🧠 ボンクイズ${dot(quizLeft())}</button></div>`;
   $('menuBtns').innerHTML = h;
-  $('menuBtns').insertAdjacentHTML('beforeend', `<button class="big" id="mShop" style="background:linear-gradient(#ffe08a,#ffb938);border-color:#b57a12">🎁 玉の景品交換所<small>持ち玉 ${state.have} 玉 ／ セリフ・ガチャ・コイン上限・応援</small></button><button class="big" id="mBontify" style="position:relative"><span style="display:inline-block">${bfLogo(26)}</span><small>にじボンの曲とつぶやき（${bfCount()} / ${BF_TRACKS.length}曲 解放）</small>${bfNew() ? '<span class="dot" style="position:absolute;right:8px;top:-5px;background:#ff3d6e;color:#fff;border-radius:9px;font-size:10px;padding:0 6px">NEW</span>' : ''}</button><button class="big" id="mBgm">🎵 BGM設定</button>`); $('mBontify').onclick = openBontify; $('mShop').onclick = () => openShop('line'); $('mBgm').onclick = openBgm; $('mDex').onclick = () => openDex(); $('mMis').onclick = () => openMissions(); $('mGacha').onclick = openGacha; $('mQuiz').onclick = openQuiz;
+  $('menuBtns').insertAdjacentHTML('beforeend', `<button class="big" id="mShop" style="background:linear-gradient(#ffe08a,#ffb938);border-color:#b57a12">🎁 玉の景品交換所<small>持ち玉 ${state.have} 玉 ／ セリフ・ガチャ・コイン上限・応援</small></button><button class="big" id="mBontify" style="position:relative"><span style="display:inline-block">${bfLogo(26)}</span><small>にじボンの曲とつぶやき（${bfCount()} / ${BF_TRACKS.length}曲 解放）</small>${bfNew() ? '<span class="dot" style="position:absolute;right:8px;top:-5px;background:#ff3d6e;color:#fff;border-radius:9px;font-size:10px;padding:0 6px">NEW</span>' : ''}</button><button class="big" id="mBgm">🎨 カスタム<small>保留・予告・BGM</small></button>`); $('mBontify').onclick = openBontify; $('mShop').onclick = () => openShop('line'); $('mBgm').onclick = () => openCustom('hold'); $('mDex').onclick = () => openDex(); $('mMis').onclick = () => openMissions(); $('mGacha').onclick = openGacha; $('mQuiz').onclick = openQuiz;
   const sr = $('menuBtns').querySelector('.subrow'); if (sr) { sr.insertAdjacentHTML('afterend', '<button class="big" id="mHow" style="background:linear-gradient(#bfe7ff,#7cc4f5);border-color:#3b8bc4;color:#103a5c">📘 ボンでもわかるパチンコ<small>遊び方・用語を、やさしく解説</small></button>'); const hb = $('mHow'); if (hb) hb.addEventListener('click', () => openHowTo(0));
     $('mHow').insertAdjacentHTML('afterend', `<div class="subrow"><button id="mData">📊 データ</button><button id="mShare">📸 結果をシェア</button></div><button class="big" id="mCalm" style="min-height:40px;font-size:13px;padding:6px"></button>`);
     const calmBtn = () => { const b = $('mCalm'); if (b) b.innerHTML = calm ? '🌙 光の演出：弱め（タップでふつうに）' : '✨ 光の演出：ふつう（タップで弱めに）'; };
@@ -1614,17 +1706,15 @@ const CHEER = [
 function gachaReady() { return G.gacha.date !== todayKey(); }
 function openGacha() {
   if (!gachaReady()) {
-    openSub(`<h2 style="font-size:22px">🎁 応援ガチャ</h2><p style="text-align:center;font-weight:800;margin:12px 0">きょうはもう引いたよ。<br>また明日、応援に来てもらおう！</p><div style="text-align:center;font-size:11px;color:#8a6a30">集めた応援カードは 図鑑 → ボン で見られるよ</div>${closeBtn}`);
+    openSub(`<h2 style="font-size:22px">🎁 応援ガチャ</h2><p style="text-align:center;font-weight:800;margin:12px 0">きょうはもう引いたよ。<br>また明日、応援に来てもらおう！</p><div style="text-align:center;font-size:11px;color:#8a6a30">応援カードは 図鑑 → ボン、パーツはタイトルの「カスタム」で使えるよ</div>${closeBtn}`);
     return;
   }
   openSub(`<h2 style="font-size:22px">🎁 応援ガチャ</h2><p style="text-align:center;font-weight:800;margin:10px 0">1日1回、むりょうで引けるよ。<br>ボンちゃんが応援に来てくれる！</p><button class="big go" id="gGo">ガチャを引く</button>${closeBtn}`);
   document.getElementById('gGo').onclick = () => {
-    const w = [16, 16, 16, 16, 16, 16, 4]; let r = Math.random() * 100, i = 0; for (; i < 7; i++) { if ((r -= w[i]) < 0) break; } i = Math.min(i, 6);
+    const i = gachaRoll();
     G.gacha.date = todayKey(); G.gacha.cards[i] = (G.gacha.cards[i] || 0) + 1; G.rec.gacha++; saveGame();
     const n = G.gacha.cards[i];
-    openSub(`<h2 style="font-size:22px">${i === 6 ? '🌈 レアカード！' : '🎁 応援カード'}</h2><div style="text-align:center"><img src="${bonArt(i)}" alt="" style="max-height:200px;max-width:60%;object-fit:contain"></div>
-      <div style="text-align:center;font-weight:900;font-size:17px;margin-top:4px">${SYMBOL_NAMES[i]}</div>
-      <p style="background:#fffbe8;border:2px solid #e0b84a;border-radius:12px;padding:8px 10px;font-weight:800;line-height:1.6;margin:8px 0">「${esc(CHEER[i])}」</p>
+    openSub(`<h2 style="font-size:22px">${PART_RARE[i] ? '🌈 レアカード！' : '🎁 ガチャカード'}</h2>${cardView(i, true)}
       <div style="text-align:center;font-size:11px;color:#8a6a30">${n === 1 ? '新しいカードをゲット！' : `${n}枚目のカード`}　（明日また引けるよ）</div>${closeBtn}`);
   };
 }
@@ -1730,9 +1820,9 @@ function openShop(tab) {
       h += '</div>';
     });
   } else if (tab === 'gacha') {
-    const have = [0, 1, 2, 3, 4, 5, 6].filter(i => G.gacha.cards[i]).length;
-    h += `<div style="${card}">玉ガチャ：${SHOP_GACHA_COST}玉で1回。応援カードが出るよ（何回でも引ける）。<br>集めたカード ${have} / 7 種　引いた回数 ${sh.pulls}回${btn('gacha', `${SHOP_GACHA_COST} 玉で引く`, state.have >= SHOP_GACHA_COST)}</div>`;
-    if (sh.last !== undefined && sh.last >= 0) h += `<div style="text-align:center"><img src="${bonArt(sh.last)}" alt="" style="max-height:150px;object-fit:contain"><div style="font-weight:900">${SYMBOL_NAMES[sh.last]}</div></div><p style="${card}">「${esc(CHEER[sh.last])}」</p>`;
+    const have = GACHA_W.map((_, i) => i).filter(i => G.gacha.cards[i]).length;
+    h += `<div style="${card}">玉ガチャ：${SHOP_GACHA_COST}玉で1回。応援カードやカスタムのパーツが出るよ（何回でも引ける）。<br>集めたカード ${have} / ${CARD_N} 種　引いた回数 ${sh.pulls}回${btn('gacha', `${SHOP_GACHA_COST} 玉で引く`, state.have >= SHOP_GACHA_COST)}</div>`;
+    if (sh.last !== undefined && sh.last >= 0) h += cardView(sh.last, false);
   } else if (tab === 'coin') {
     const ex = sh.extra | 0, can = ex < SHOP_EXTRA_MAX;
     h += `<div style="${card}">🪙 ボンコインと交換：${SHOP_COIN_COST}玉で1枚（いまの所持 ${save.coins} / ${COIN.max}）${btn('coin', `${SHOP_COIN_COST} 玉で1枚もらう`, state.have >= SHOP_COIN_COST && save.coins < COIN.max)}</div>`;
@@ -1753,7 +1843,7 @@ function openShop(tab) {
     if (act === 'line') { if (!shopSpend(SHOP_LINE_COST[+c])) return; sh.lines[a + '_' + c] = 1; }
     else if (act === 'gacha') {
       if (!shopSpend(SHOP_GACHA_COST)) return;
-      const w = [16, 16, 16, 16, 16, 16, 4]; let r = Math.random() * 100, i = 0; for (; i < 7; i++) { if ((r -= w[i]) < 0) break; } i = Math.min(i, 6);
+      const i = gachaRoll();
       G.gacha.cards[i] = (G.gacha.cards[i] || 0) + 1; G.rec.gacha++; sh.pulls++; sh.last = i;
     } else if (act === 'coin') { if (save.coins >= COIN.max) { toast('コインは満タンだよ'); return; } if (!shopSpend(SHOP_COIN_COST)) return; save.coins++; if (save.coins >= COIN.max) save.nextAt = null; }
     else if (act === 'extra') { const ex = sh.extra | 0; if (ex >= SHOP_EXTRA_MAX || !shopSpend(SHOP_EXTRA_COST[ex])) return; sh.extra = ex + 1; if (save.coins < COIN.max && !save.nextAt) save.nextAt = Date.now() + COIN.recoverMs; }
@@ -2083,30 +2173,49 @@ function shrinkImage(file, cb) {
   im.onerror = () => { URL.revokeObjectURL(url); cb(null); };
   im.src = url;
 }
-function openBgm() {
-  const sel = bgmCfg.sel;
-  let h = '<h2 style="font-size:22px">🎵 BGM・キャラ設定</h2>';
-  h += '<div class="bgmh">大当たりのテーマ曲（押すと試聴できるよ）</div><div class="bgmsel">';
+function bgmBody() {
+  let h = '<div class="bgmh">大当たりのテーマ曲（押すと試聴できるよ）</div><div class="bgmsel">';
   [['prism', 'PRISM SPIN', 'にじボンのテーマ（高め・速め）'], ['fever', 'BONBON FEVER!!', '共通の大当たりテーマ']].forEach(([k, n, sm]) => { h += `<button data-win="${k}" class="${bgmCfg.win === k ? 'on' : ''}">${n}<small>${sm}</small></button>`; });
-  h += '</div><div class="bgmh" style="opacity:.8;font-weight:700">各キャラのテーマ：実装準備中</div>';
   h += '</div><div class="bgmh">通常変動曲の再生方式（ルーレットが回っている間の曲）</div><div class="bgmsel">';
   [['one', 'BGM①固定', '「UTOPIA SPIN…？」'], ['two', 'BGM②固定', '「UTOPIA SPIN!!!」'], ['link', '期待度連動', '期待度が高いほど②が出やすい']].forEach(([k, n, sm]) => { h += `<button data-spin="${k}" class="${bgmCfg.spin === k ? 'on' : ''}" ${k === 'link' ? 'style="grid-column:1/-1"' : ''}>${n}<small>${sm}</small></button>`; });
-  h += '</div>';
+  return h + '</div>';
+}
+function openBgm() { openCustom('bgm'); }
+function openCustom(tab) {
+  tab = tab || 'hold'; bgmPreviewStop();
+  const tabs = [['hold', '保留'], ['yk', '予告'], ['bgm', 'BGM']];
+  let h = '<h2 style="font-size:22px">🎨 カスタム</h2><div class="bgmsel" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px">' + tabs.map(([k, n]) => `<button data-ctab="${k}" class="${tab === k ? 'on' : ''}">${n}</button>`).join('') + '</div>';
+  const opt = (attr, val, on, label, sub, locked, img) => `<button ${locked ? 'disabled' : `data-${attr}="${val}"`} class="${on ? 'on' : ''}" style="${locked ? 'opacity:.45;' : ''}">${img ? `<img src="${img}" alt="" style="width:100%;border-radius:6px;display:block;margin-bottom:3px">` : ''}${label}<small>${locked ? '🔒 ガチャで入手' : (sub || '')}</small></button>`;
+  if (tab === 'hold') {
+    h += '<div class="bgmh">保留ランプの見た目（変わるのは見た目だけ。当たりやすさは同じ）</div><div class="bgmsel">';
+    const hd = holdDesign();
+    h += opt('hold', 'dot', hd === 'dot', 'ふつう（まる）', '', false, holdPreview('dot'));
+    Object.keys(PARTS).filter(id => PARTS[id].kind === 'hold').forEach(id => { const p = PARTS[id]; h += opt('hold', p.key, hd === p.key, p.name, '', !partOwned(p.key), holdPreview(p.key)); });
+    h += '</div>';
+  } else if (tab === 'yk') {
+    const fd = fxDesign();
+    h += '<div class="bgmh">予告のエフェクト（予告のときに重なる見た目）</div><div class="bgmsel">';
+    h += opt('fx', 'none', fd === 'none', 'なし', '', false);
+    Object.keys(PARTS).filter(id => PARTS[id].kind === 'fx').forEach(id => { const p = PARTS[id]; h += opt('fx', p.key, fd === p.key, p.name, '', !partOwned(p.key), partOwned(p.key) ? fxPreview(p.key) : ''); });
+    h += '</div><div class="bgmh">予告に出るボンちゃん（図鑑で解放したキャラだけ選べるよ）</div><div class="bgmsel" style="grid-template-columns:repeat(2,1fr)">';
+    h += opt('ykc', 'auto', custom.ykChar === 'auto', 'おまかせ', 'ランダム', false);
+    for (let i = 0; i < 7; i++) h += opt('ykc', i, custom.ykChar === i, SYMBOL_NAMES[i], '', !bonOpen(i));
+    h += '</div><div class="bgmh">出す予告を選ぶ（ONの予告だけが出るよ）</div><div class="bgmsel" style="grid-template-columns:repeat(2,1fr)">';
+    Object.keys(YOKOKU).forEach(k => { const on = custom.yk[k] !== false; h += `<button data-yk="${k}" class="${on ? 'on' : ''}">${YOKOKU[k].name}<small>${on ? 'ON' : 'OFF'}</small></button>`; });
+    h += '</div><div style="font-size:11px;color:#8a6a30;margin-top:6px;line-height:1.5">※ 予告をOFFにしても、当たりやすさ（確率）は変わらないよ。見せ方が変わるだけ。<br>全部OFFにすると予告なしで回るよ。</div><button id="ykAll" style="flex:none;width:100%;margin-top:6px;min-height:34px">全部ONに戻す</button>';
+  } else {
+    h += bgmBody();
+  }
   openSub(h + closeBtn);
-  const box = $('subBox');
-  box.querySelectorAll('[data-sel]').forEach(b => b.onclick = () => { bgmCfg.sel = b.dataset.sel === 'auto' ? 'auto' : +b.dataset.sel; saveBgmCfg(); bgmPreviewStop(); openBgm(); });
-  box.querySelectorAll('[data-win]').forEach(b => b.onclick = () => { bgmCfg.win = b.dataset.win; saveBgmCfg(); bgmPreviewStop(); openBgm(); bgmPreviewing = true; AC(); bgmPlay(themeName()); });
-  box.querySelectorAll('[data-spin]').forEach(b => b.onclick = () => { bgmCfg.spin = b.dataset.spin; saveBgmCfg(); bgmPreviewStop(); openBgm(); });
-  box.querySelectorAll('[data-play]').forEach(b => b.onclick = () => {
-    const n = b.dataset.play;
-    if (bgmPreviewing && bgm.name === n) { bgmPreviewStop(); return; }
-    bgmStop(); bgmPreviewing = true; AC(); bgmPlay(n);
-  });
-  box.querySelectorAll('[data-set]').forEach(b => b.onclick = () => pickFile('audio/*', f => {
-    if (f.size > 12 * 1024 * 1024) { toast('ファイルが大きすぎるよ（12MBまで）'); return; }
-    bgmPreviewStop(); mediaPut(bgmKeyOf(b.dataset.set), f); toast('曲を登録したよ'); openBgm();
-  }));
-  box.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => { bgmPreviewStop(); mediaDel(bgmKeyOf(b.dataset.reset)); toast('内蔵の曲に戻したよ'); openBgm(); });
+  const box = $('subBox'), again = () => openCustom(tab);
+  box.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => openCustom(b.dataset.ctab));
+  box.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => { custom.hold = b.dataset.hold; saveCustom(); again(); });
+  box.querySelectorAll('[data-fx]').forEach(b => b.onclick = () => { custom.fx = b.dataset.fx; saveCustom(); again(); });
+  box.querySelectorAll('[data-ykc]').forEach(b => b.onclick = () => { custom.ykChar = b.dataset.ykc === 'auto' ? 'auto' : +b.dataset.ykc; saveCustom(); again(); });
+  box.querySelectorAll('[data-yk]').forEach(b => b.onclick = () => { const k = b.dataset.yk; custom.yk[k] = custom.yk[k] === false; saveCustom(); again(); });
+  const ya = $('ykAll'); if (ya) ya.onclick = () => { custom.yk = {}; saveCustom(); again(); };
+  box.querySelectorAll('[data-win]').forEach(b => b.onclick = () => { bgmCfg.win = b.dataset.win; saveBgmCfg(); again(); bgmPreviewing = true; AC(); bgmPlay(themeName()); });
+  box.querySelectorAll('[data-spin]').forEach(b => b.onclick = () => { bgmCfg.spin = b.dataset.spin; saveBgmCfg(); again(); });
 }
 (function () {
   const st = document.createElement('style');
