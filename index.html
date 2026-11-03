@@ -27,6 +27,7 @@
   #boardWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; background: linear-gradient(#0e1438, #070b22); box-shadow: inset 0 0 0 3px #c9972b, inset 0 0 18px rgba(0,0,0,.7); }
   #cv { display: block; border-radius: 16px 16px 0 0; }
   #lcdCv { position: absolute; border-radius: 10px; box-shadow: 0 0 0 3px #f6dc8a, 0 0 0 5px #9a6f12, 0 0 0 7px rgba(255,255,255,.55), 0 8px 16px rgba(0,0,0,.55); cursor: pointer; z-index: 2; }
+  #lcdZoom { position: absolute; right: 6px; top: 6px; z-index: 5; flex: none; width: auto; min-height: 0; margin: 0; padding: 4px 10px; font-size: 11px; font-weight: 800; border-radius: 999px; border: 2px solid #f6dc8a; background: rgba(20,16,50,.82); color: #ffe9a8; box-shadow: none; }
   #fxCv { position: absolute; pointer-events: none; z-index: 3; border-radius: 16px 16px 0 0; }
   .cab-win #cv { box-shadow: 0 0 30px 6px rgba(255,214,90,.65); }
   #toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: rgba(40,28,0,.88); color: #ffe9a8; border: 1px solid #ffd86b; padding: 5px 14px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; z-index: 9; }
@@ -99,14 +100,14 @@
     <div id="tStage"><img id="tImg" alt=""></div><div id="tDots"></div>
     <h2>BON UTOPIA</h2>
     <div class="cc">夢も、希望も、<span id="ttlDbg">大当たり</span>も！</div>
-    <div class="coinbar">🪙 ボンコイン <b id="mCoin">0</b> / 5<br><span id="mNext"></span></div>
+    <div class="coinbar">🪙 ボンコイン <b id="mCoin">0</b> / <span id="mMax">5</span><br><span id="mNext"></span></div>
     <div id="menuBtns"></div>
     <div class="rec" id="menuRec"></div>
     <div class="free">完全無料・課金なし・換金なし。ボンコインは1時間に1枚、自動で回復するよ。</div>
   </div></div>
   <div id="empty" class="ov"><div class="box">
     <h2 style="font-size:22px">玉がなくなったよ</h2>
-    <div class="coinbar">🪙 ボンコイン <b id="eCoin">0</b> / 5<br><span id="eNext"></span></div>
+    <div class="coinbar">🪙 ボンコイン <b id="eCoin">0</b> / <span id="eMax">5</span><br><span id="eNext"></span></div>
     <button class="big go" id="eRefill">ボンコインを使って玉を補充する</button>
     <button class="big" id="eQuit">遊技を終了する</button>
   </div></div>
@@ -126,6 +127,7 @@
       <canvas id="cv"></canvas>
       <canvas id="lcdCv" aria-label="液晶画面（タップで演出スキップ）"></canvas>
       <canvas id="fxCv"></canvas>
+      <button id="lcdZoom" type="button">🔍 液晶を大きく</button>
       <div id="toast"></div>
     </div>
     <!-- ④ 操作部分 ⑤ 下部パネル -->
@@ -620,7 +622,7 @@ function drawLCD(c) {
     c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.stroke();
   }
   if (supportOn()) {
-    const kk = MODE.k === 'kaku', txt = kk ? '確変中' : `時短 残り${MODE.left}`;
+    const kk = MODE.k === 'kaku', txt = kk ? `確変 残り${MODE.left}` : `時短 残り${MODE.left}`;
     c.font = 'bold 11px sans-serif'; c.textAlign = 'left'; const w = c.measureText(txt).width + 14;
     c.fillStyle = kk ? 'rgba(255,60,90,.88)' : 'rgba(40,150,255,.88)'; roundRect(c, LCD.x + 6, LCD.y + 6, w, 18, 9); c.fill();
     c.fillStyle = '#fff'; c.textBaseline = 'middle'; c.fillText(txt, LCD.x + 13, LCD.y + 15.5);
@@ -1083,6 +1085,8 @@ function roundRect(c, x, y, w, h, r) {
   c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
 }
 
+const LCD_ZOOM = 1.45; let lcdZoom = false;
+try { lcdZoom = localStorage.getItem('bonutopia_lcdzoom') === '1'; } catch (e) {}
 function resize() {
   const wrap = document.getElementById('boardWrap');
   const aw = wrap.clientWidth, ah = wrap.clientHeight;
@@ -1094,7 +1098,9 @@ function resize() {
   renderStatic();
   const ox = cv.offsetLeft, oy = cv.offsetTop;
   const place = (el, x, y, w, h) => { el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px'; el.width = Math.round(w * dpr); el.height = Math.round(h * dpr); };
-  place(lcdCv, ox + LCDP.x * css, oy + LCDP.y * css, LCDP.w * css, LCDP.h * css);
+  const z = lcdZoom ? LCD_ZOOM : 1, zw = LCDP.w * css * z, zh = LCDP.h * css * z;   // 液晶の表示だけを大きくする（玉の当たり判定は変えない）
+  const zx = Math.min(Math.max(ox + (LCDP.x + LCDP.w / 2) * css - zw / 2, ox + 2), ox + W * css - zw - 2);
+  place(lcdCv, zx, oy + LCDP.y * css, zw, zh);
   place(fxCv, ox, oy, W * css, H * css);
 }
 
@@ -1245,11 +1251,12 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 /* ---------- 確変・時短・進行データ ---------- */
 const MODE = { k: 'normal', left: 0 };           // normal / kaku(確変) / jitan(時短) / bonus(大当たり中)
 const JITAN_SPINS = 100;
+const KAKU_SPINS = 50;   // 確変（ST）の回転数。この回転数で当たらなければ通常（左打ち）に戻る。数字を変えれば調整できる
 const KAKU_SYMS = new Set([1, 3, 5, 6, 14, 15]);  // 数字2・4・6・7、STAR、FEVER の大当たりは確変
 const supportOn = () => MODE.k === 'kaku' || MODE.k === 'jitan';
 function probNow() { return MODE.k === 'kaku' ? Math.max(2, Math.round(LOTTERY.prob / 7)) : LOTTERY.prob; }
 const todayKey = (d = new Date()) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-const newG = () => ({ login: { last: '', streak: 0, total: 0 }, daily: { date: '', m: {}, claimed: {} }, gacha: { date: '', cards: {} },
+const newG = () => ({ login: { last: '', streak: 0, total: 0 }, daily: { date: '', m: {}, claimed: {} }, shop: { lines: {}, extra: 0, cheer: [0, 0, 0, 0, 0, 0, 0], pulls: 0 }, gacha: { date: '', cards: {} },
   dex: { sym: {}, symSeen: {}, yk: {}, rc: {}, sp: {}, bon: {} }, rec: { bestChain: 0, kaku: 0, jitan: 0, seven: 0, premium: 0, den: 0, gacha: 0, quizOk: 0, quizAll: 0 }, ach: {}, chain: 0, quiz: { date: '', count: 0, ok: 0, asked: [] }, life: { spins: 0, wins: 0, plays: 0 } });
 let G = newG();
 function dailyCheck() { const t = todayKey(); if (G.daily.date !== t) G.daily = { date: t, m: {}, claimed: {} }; }
@@ -1267,14 +1274,15 @@ function onWin(res) {   // 当たりが確定して液晶が揃った時点の�
   dm('win');
 }
 function onLose() {
+  if (MODE.k === 'kaku') { MODE.left--; if (MODE.left <= 0) { MODE.k = 'normal'; G.chain = 0; setSide('L'); toast('確変が終わったよ。左打ちに戻そう'); } }
   if (MODE.k === 'jitan') { MODE.left--; if (MODE.left <= 0) { MODE.k = 'normal'; G.chain = 0; setSide('L'); toast('時短が終わったよ。左打ちに戻そう'); } }
 }
 function endBonusMode() {   // 10ラウンド終了：図柄で確変／時短へ
-  if (KAKU_SYMS.has(bonus.sym)) { MODE.k = 'kaku'; MODE.left = 0; G.rec.kaku++; dexMark('sp', 'kaku'); toast('確変突入！右打ちで電チューを狙え！'); }
+  if (KAKU_SYMS.has(bonus.sym)) { MODE.k = 'kaku'; MODE.left = KAKU_SPINS; G.rec.kaku++; dexMark('sp', 'kaku'); toast(`確変 ${KAKU_SPINS}回転！右打ちで電チューを狙え！`); }
   else { MODE.k = 'jitan'; MODE.left = JITAN_SPINS; G.rec.jitan++; dexMark('sp', 'jitan'); toast(`時短 ${JITAN_SPINS}回転！右打ちで電チューを狙え！`); }
   setSide('R');
 }
-const COIN = { max: 5, recoverMs: 60 * 60 * 1000, key: 'bonutopia_v1' };
+const COIN = { get max() { return 5 + ((G && G.shop && G.shop.extra) | 0); }, recoverMs: 60 * 60 * 1000, key: 'bonutopia_v1' };
 const RATES = {
   4: { lend: 250,  interval: 0.35, label: '4円パチンコ', note: '貸玉250玉・じっくり打てる(玉の価値 大)' },
   1: { lend: 1000, interval: 0.20, label: '1円パチンコ', note: '貸玉1000玉・どんどん打てる(玉の価値 1/4)' },
@@ -1289,7 +1297,7 @@ function loadGame() {
   if (d && typeof d.coins === 'number') {
     save = { coins: Math.min(99, Math.max(0, d.coins | 0)), nextAt: d.nextAt || null, rate: d.rate === 1 ? 1 : 4 };
     if (d.g && typeof d.g === 'object') { const base = newG(); for (const k of Object.keys(base)) { const v = d.g[k]; base[k] = (v !== undefined && typeof v === typeof base[k]) ? (typeof v === 'object' ? Object.assign(base[k], v) : v) : base[k]; } G = base; }
-    if (d.mode && (d.mode.k === 'kaku' || d.mode.k === 'jitan')) { MODE.k = d.mode.k; MODE.left = Math.max(0, d.mode.left | 0); }
+    if (d.mode && (d.mode.k === 'kaku' || d.mode.k === 'jitan')) { MODE.k = d.mode.k; MODE.left = Math.max(0, d.mode.left | 0); if (MODE.k === 'kaku' && MODE.left <= 0) MODE.left = KAKU_SPINS; }
     const st = d.state || {};
     const pd = d.pending;
     if (pd && typeof pd === 'object') {
@@ -1352,7 +1360,7 @@ function renderMenu() {
   const dot = n => n > 0 ? `<span class="dot">${n > 9 ? '9+' : n}</span>` : '';
   h += `<div class="subrow"><button id="mDex">📖 図鑑</button><button id="mMis">🎯 ミッション${dot(claimCount())}</button><button id="mGacha">🎁 応援ガチャ${gachaReady() ? '<span class="dot">!</span>' : ''}</button><button id="mQuiz">🧠 ボンクイズ${dot(quizLeft())}</button></div>`;
   $('menuBtns').innerHTML = h;
-  $('menuBtns').insertAdjacentHTML('beforeend', `<button class="big" id="mBontify" style="position:relative"><span style="display:inline-block">${bfLogo(26)}</span><small>にじボンの曲とつぶやき（${bfCount()} / ${BF_TRACKS.length}曲 解放）</small>${bfNew() ? '<span class="dot" style="position:absolute;right:8px;top:-5px;background:#ff3d6e;color:#fff;border-radius:9px;font-size:10px;padding:0 6px">NEW</span>' : ''}</button><button class="big" id="mBgm">🎵 BGM設定</button>`); $('mBontify').onclick = openBontify; $('mBgm').onclick = openBgm; $('mDex').onclick = () => openDex(); $('mMis').onclick = () => openMissions(); $('mGacha').onclick = openGacha; $('mQuiz').onclick = openQuiz;
+  $('menuBtns').insertAdjacentHTML('beforeend', `<button class="big" id="mShop" style="background:linear-gradient(#ffe08a,#ffb938);border-color:#b57a12">🎁 玉の景品交換所<small>持ち玉 ${state.have} 玉 ／ セリフ・ガチャ・コイン上限・応援</small></button><button class="big" id="mBontify" style="position:relative"><span style="display:inline-block">${bfLogo(26)}</span><small>にじボンの曲とつぶやき（${bfCount()} / ${BF_TRACKS.length}曲 解放）</small>${bfNew() ? '<span class="dot" style="position:absolute;right:8px;top:-5px;background:#ff3d6e;color:#fff;border-radius:9px;font-size:10px;padding:0 6px">NEW</span>' : ''}</button><button class="big" id="mBgm">🎵 BGM設定</button>`); $('mBontify').onclick = openBontify; $('mShop').onclick = () => openShop('line'); $('mBgm').onclick = openBgm; $('mDex').onclick = () => openDex(); $('mMis').onclick = () => openMissions(); $('mGacha').onclick = openGacha; $('mQuiz').onclick = openQuiz;
   $('menuRec').innerHTML = `遊技記録：遊技 ${state.plays}回 ／ 打った玉 ${state.shot} ／ 入賞 ${state.hit} ／ 通常回転 ${state.spins} ／ 大当たり ${state.wins}回 ／ 最高持ち玉 ${state.maxHave}`;
   const rb = $('menuBtns').querySelector('#mResume'); if (rb) rb.onclick = () => beginPlay(false);
   $('menuBtns').querySelectorAll('[data-rate]').forEach(b => b.onclick = () => {
@@ -1389,11 +1397,11 @@ function updateHud() {
   $('r4').disabled = $('r1').disabled = locked;
   $('bLend').disabled = !playing || save.coins <= 0;
   if (state.have > state.maxHave) state.maxHave = state.have;
-  if ($('menu').classList.contains('show')) { $('mCoin').textContent = save.coins; $('mNext').textContent = nextText(); const need = !hasSession(); if (need && $('menuBtns').querySelector('[data-rate]') && $('menuBtns').querySelector('[data-rate]').disabled !== (save.coins <= 0)) renderMenu(); }
+  if ($('menu').classList.contains('show')) { $('mCoin').textContent = save.coins; $('mMax').textContent = COIN.max; $('mNext').textContent = nextText(); const need = !hasSession(); if (need && $('menuBtns').querySelector('[data-rate]') && $('menuBtns').querySelector('[data-rate]').disabled !== (save.coins <= 0)) renderMenu(); }
   const em = $('empty');
   if (playing && !debugMode && state.have <= 0 && balls.length === 0 && lcd.phase === 'idle' && state.queue.length === 0) {
     if (!em.classList.contains('show')) em.classList.add('show');
-    $('eCoin').textContent = save.coins; $('eNext').textContent = nextText();
+    $('eCoin').textContent = save.coins; $('eMax').textContent = COIN.max; $('eNext').textContent = nextText();
     $('eRefill').disabled = save.coins <= 0;
     $('eRefill').textContent = save.coins > 0 ? `ボンコインを使って玉を補充する（+${RATES[save.rate].lend}玉）` : 'ボンコインがありません';
   }
@@ -1566,6 +1574,68 @@ function openGacha() {
       <p style="background:#fffbe8;border:2px solid #e0b84a;border-radius:12px;padding:8px 10px;font-weight:800;line-height:1.6;margin:8px 0">「${esc(CHEER[i])}」</p>
       <div style="text-align:center;font-size:11px;color:#8a6a30">${n === 1 ? '新しいカードをゲット！' : `${n}枚目のカード`}　（明日また引けるよ）</div>${closeBtn}`);
   };
+}
+
+
+/* ---------- 玉の景品交換所（貯めた持ち玉の使い道。ゲーム内だけで完結・換金や課金には一切つながらない） ---------- */
+const SHOP_LINES = [
+  ['べ、別に応援なんて頼んでないけど……ありがと。アタシ、もっと勝つから見てなさいよ！', '玉をためる人、嫌いじゃないわ。運も実力のうちなの。', '勝負の記録、今日は大勝ちって書いておくわ。……負けた日は書かないけどね。'],
+  ['玉がいっぱい！ みんなで山わけしよ〜！', '今日も一緒に遊べてうれしいな。友だち、またいっぱい増えたよ！', '歌って踊って、大当たり！ にこ、そんな気分なんだ〜♪'],
+  ['ひょえっ！？ そんなにもらっていいの……？ ボン、縫い物のお礼にがんばるよ……', 'ボン、ちっちゃいけど……応援されるとすごく力が出るんだ。', '針も玉も、まっすぐ通ればうまくいくんだよ……たぶん。'],
+  ['玉におにぎり……ううん、おにぎりに玉！ もぐもぐ。', 'ごはんが一番。でも、大当たりも同じくらい好きだよ。もぐ。', '畑の収穫みたいに、玉もたくさん実るといいね。もぐもぐ。'],
+  ['ふあぁ……玉の夢、見たよ。起きたらほんとにあった……', '……zzz……あ、起きてるよ。ねむ、ちゃんと見てたもん。', '夢の日記に書いておくね。「今日は玉がいっぱい」。おやすみ……'],
+  ['あ、ありがとう……。これ、お礼の詩……読まないで……やっぱり読んで……', '「玉はころころ 夢はふわふわ」……て、照れるから聞かないで！', 'ぽ、ぽっと赤くなっちゃった……玉、大事にするね。'],
+  ['うむ！ よく聞けい！ お主の玉、我輩が虹色に磨いてやろうではないか！', '雨あがりの虹は、お主が玉を貯めた日にだけ特別に濃くなるのだぞ。……たぶんな！', 'わっはっは！ じゃじゃーん！ 景品はお主のものだ。我輩は満足である！'],
+];
+const SHOP_LINE_COST = [500, 1000, 2000], SHOP_GACHA_COST = 300, SHOP_COIN_COST = 1500, SHOP_EXTRA_COST = [1500, 3000, 4500, 6000, 8000], SHOP_EXTRA_MAX = 5, SHOP_CHEER_UNIT = 100;
+const SHOP_TITLES = ['', 'ファン', 'ファンクラブ会員', '親衛隊', '殿堂入り'];
+const shopLv = i => Math.min(4, Math.floor((G.shop.cheer[i] || 0) / 1000));
+function shopSpend(n) { if (state.have < n) { toast(`玉がたりないよ（あと ${n - state.have} 玉）`); return false; } state.have -= n; saveGame(); return true; }
+function openShop(tab) {
+  const sh = G.shop; tab = tab || 'line';
+  const tabs = [['line', 'セリフ'], ['gacha', 'ガチャ'], ['coin', 'コイン'], ['cheer', '応援']];
+  let h = `<h2 style="font-size:22px">🎁 玉の景品交換所</h2><div style="text-align:center;font-weight:900;margin:4px 0 8px">持ち玉 <span style="font-size:20px;color:#c0560a">${state.have}</span> 玉</div>`;
+  h += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px">${tabs.map(([k, n]) => `<button data-tab="${k}" style="flex:none;min-height:36px;font-size:13px;border-radius:10px;border:2px solid ${k === tab ? '#b57a12' : '#d9c9a3'};background:${k === tab ? '#ffe08a' : '#fff'};color:#3a2a10;font-weight:800">${n}</button>`).join('')}</div>`;
+  const card = 'background:#fffbe8;border:2px solid #e0b84a;border-radius:12px;padding:8px 10px;margin:6px 0;font-weight:700;line-height:1.6;font-size:13px';
+  const btn = (id, label, ok) => `<button data-do="${id}" style="flex:none;width:100%;min-height:38px;margin-top:6px;border-radius:10px;border:2px solid #b57a12;background:${ok ? 'linear-gradient(#ffe08a,#ffb938)' : '#e6e0cc'};color:#3a2a10;font-weight:900">${label}</button>`;
+  if (tab === 'line') {
+    h += '<div style="font-size:12px;color:#8a6a30;margin-bottom:4px">玉と交換して、ボンたちのセリフを集めよう（1人3つ）。</div>';
+    SHOP_LINES.forEach((ls, i) => {
+      h += `<div style="${card}"><b>${SYMBOL_NAMES[i]}</b>`;
+      ls.forEach((t, k) => { const got = sh.lines[i + '_' + k]; h += got ? `<div style="margin-top:4px">「${esc(t)}」</div>` : `<div style="margin-top:4px;color:#8a7a50">？？？？？？？</div>${btn('line:' + i + ':' + k, `${SHOP_LINE_COST[k]} 玉で交換`, state.have >= SHOP_LINE_COST[k])}`; });
+      h += '</div>';
+    });
+  } else if (tab === 'gacha') {
+    const have = [0, 1, 2, 3, 4, 5, 6].filter(i => G.gacha.cards[i]).length;
+    h += `<div style="${card}">玉ガチャ：${SHOP_GACHA_COST}玉で1回。応援カードが出るよ（何回でも引ける）。<br>集めたカード ${have} / 7 種　引いた回数 ${sh.pulls}回${btn('gacha', `${SHOP_GACHA_COST} 玉で引く`, state.have >= SHOP_GACHA_COST)}</div>`;
+    if (sh.last !== undefined && sh.last >= 0) h += `<div style="text-align:center"><img src="${bonArt(sh.last)}" alt="" style="max-height:150px;object-fit:contain"><div style="font-weight:900">${SYMBOL_NAMES[sh.last]}</div></div><p style="${card}">「${esc(CHEER[sh.last])}」</p>`;
+  } else if (tab === 'coin') {
+    const ex = sh.extra | 0, can = ex < SHOP_EXTRA_MAX;
+    h += `<div style="${card}">🪙 ボンコインと交換：${SHOP_COIN_COST}玉で1枚（いまの所持 ${save.coins} / ${COIN.max}）${btn('coin', `${SHOP_COIN_COST} 玉で1枚もらう`, state.have >= SHOP_COIN_COST && save.coins < COIN.max)}</div>`;
+    h += `<div style="${card}">📦 コインの所持上限を増やす：いま ${COIN.max}枚（最大 ${5 + SHOP_EXTRA_MAX}枚）${can ? btn('extra', `${SHOP_EXTRA_COST[ex]} 玉で上限+1`, state.have >= SHOP_EXTRA_COST[ex]) : '<div style="margin-top:6px;color:#2e7d4b">最大まで増やしたよ！</div>'}</div>`;
+  } else {
+    const order = [0, 1, 2, 3, 4, 5, 6].sort((a, b) => (sh.cheer[b] || 0) - (sh.cheer[a] || 0));
+    h += `<div style="font-size:12px;color:#8a6a30;margin-bottom:4px">玉を寄付して、好きなボンを応援しよう。${SHOP_CHEER_UNIT}玉＝${SHOP_CHEER_UNIT}ポイント。1000ポイントごとに称号が上がるよ。</div>`;
+    order.forEach((i, r) => {
+      const pt = sh.cheer[i] || 0, lv = shopLv(i), nxt = lv >= 4 ? 4000 : (lv + 1) * 1000;
+      h += `<div style="${card}"><b>${r + 1}位　${SYMBOL_NAMES[i]}</b>${lv ? `　<span style="color:#c0560a">【${SHOP_TITLES[lv]}】</span>` : ''}<div style="height:8px;border-radius:5px;background:#eadfba;margin:4px 0;overflow:hidden"><i style="display:block;height:100%;width:${Math.min(100, pt / nxt * 100)}%;background:linear-gradient(90deg,#ff9f1c,#e0356a)"></i></div><span style="font-size:11px;color:#8a6a30">${pt} pt${lv >= 4 ? '（殿堂入り！）' : ` ／ 次の称号まで ${nxt - pt}`}</span>${btn('cheer:' + i, `${SHOP_CHEER_UNIT} 玉で応援する`, state.have >= SHOP_CHEER_UNIT)}</div>`;
+    });
+  }
+  openSub(h + closeBtn);
+  const box = $('subBox');
+  box.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => openShop(b.dataset.tab));
+  box.querySelectorAll('[data-do]').forEach(b => b.onclick = () => {
+    const [act, a, c] = b.dataset.do.split(':');
+    if (act === 'line') { if (!shopSpend(SHOP_LINE_COST[+c])) return; sh.lines[a + '_' + c] = 1; }
+    else if (act === 'gacha') {
+      if (!shopSpend(SHOP_GACHA_COST)) return;
+      const w = [16, 16, 16, 16, 16, 16, 4]; let r = Math.random() * 100, i = 0; for (; i < 7; i++) { if ((r -= w[i]) < 0) break; } i = Math.min(i, 6);
+      G.gacha.cards[i] = (G.gacha.cards[i] || 0) + 1; G.rec.gacha++; sh.pulls++; sh.last = i;
+    } else if (act === 'coin') { if (save.coins >= COIN.max) { toast('コインは満タンだよ'); return; } if (!shopSpend(SHOP_COIN_COST)) return; save.coins++; if (save.coins >= COIN.max) save.nextAt = null; }
+    else if (act === 'extra') { const ex = sh.extra | 0; if (ex >= SHOP_EXTRA_MAX || !shopSpend(SHOP_EXTRA_COST[ex])) return; sh.extra = ex + 1; if (save.coins < COIN.max && !save.nextAt) save.nextAt = Date.now() + COIN.recoverMs; }
+    else if (act === 'cheer') { if (!shopSpend(SHOP_CHEER_UNIT)) return; sh.cheer[+a] = (sh.cheer[+a] || 0) + SHOP_CHEER_UNIT; }
+    saveGame(); toast('交換したよ！'); updateUI(); renderMenu(); openShop(tab);
+  });
 }
 
 /* ---------- ボンクイズ（1日3回まで・正解でボンコイン1枚） ---------- */
@@ -2121,6 +2191,12 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+(function () {
+  const zb = document.getElementById('lcdZoom');
+  const sync = () => { zb.textContent = lcdZoom ? '🔍 液晶をもどす' : '🔍 液晶を大きく'; };
+  zb.addEventListener('click', () => { lcdZoom = !lcdZoom; try { localStorage.setItem('bonutopia_lcdzoom', lcdZoom ? '1' : '0'); } catch (e) {} sync(); resize(); });
+  sync();
+})();
 resize(); updateDial(); updateUI();
 requestAnimationFrame(t => { last = t; frame(t); });
 })();
