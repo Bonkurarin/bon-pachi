@@ -213,7 +213,7 @@ const LANE_S = 0.06;          // 発射時の右向き成分（レーンの傾�
 const LCD = { x: 120, y: 64, w: 240, h: 190 };      // 液晶の描画用の仮想座標（専用canvasへ拡大して表示）
 const LCDP = { x: 100, y: 56, w: 280, h: 222 };       // 盤面上で液晶が占める物理範囲（玉は当たる）
 const YAKU = { x: 240, y: 338, r: 24 };               // 中央役物
-const CHUCKER = { x: 218, y: 652, w: 44, h: 16 };
+const CHUCKER = { x: 225, y: 652, w: 30, h: 16 };
 /* 右打ち用：液晶の右側の右ルート（仕切りレール）と右アタッカー */
 const CH = { x: 394, y0: 290, y1: 552 };               // 右ルートの仕切りレール
 const STG = { x0: 64, y0: 334, x1: 190, y1: 410 };     // 左打ちの玉を中央へ導くステージレール
@@ -243,7 +243,7 @@ function wmNear(x, y) { return WM.some(w => Math.hypot(x - w.x, y - w.y) < WM_R 
   // 右ルートの玉をはねさせる釘
   [[430, 340], [452, 384], [430, 428], [452, 472], [430, 516]].forEach(([x, y]) => nails.push({ x, y }));
   // チャッカーへ導くV字の釘
-  for (let i = 0; i <= 4; i++) {
+  for (let i = 0; i <= 1; i++) {   // 玉が入りすぎたので、チャッカー近くの導き釘を減らした（上の2本だけ残す）
     const t = i / 4;
     nails.push({ x: 126 + (CHUCKER.x - 8 - 126) * t, y: 580 + (648 - 580) * t });
     nails.push({ x: 354 + (CHUCKER.x + CHUCKER.w + 8 - 354) * t, y: 580 + (648 - 580) * t });
@@ -1768,6 +1768,18 @@ function mediaDel(key) {
 
 /* ---------- 曲の再生（登録済みファイル優先、なければ内蔵曲） ---------- */
 const bgmAudio = { el: null, key: null };
+const bgmEls = {}; let bgmBlocked = false;
+/* 最初のタップで曲の要素を“解錠”しておく（スマホでは、タップなしで作った音は鳴らないことがある）。ブロックされていた曲は次のタップで鳴らし直す */
+function bgmUnlock() {
+  ['spin1', 'spin2', 'fever'].forEach(n => {
+    const u = bgmCustomUrl(n); if (!u) return;
+    let a = bgmEls[n]; if (!a || a.dataset.u !== u) { a = new Audio(u); a.dataset.u = u; a.preload = 'auto'; a.loop = true; bgmEls[n] = a; }
+    if (a === bgmAudio.el || !a.paused) return;
+    try { a.muted = true; const p = a.play(); if (p && p.then) p.then(() => { if (a !== bgmAudio.el) { a.pause(); a.currentTime = 0; } a.muted = false; }).catch(() => {}); } catch (e) {}
+  });
+  if (bgmBlocked && bgmAudio.el && bgmAudio.el.paused) { bgmBlocked = false; try { bgmAudio.el.play().catch(() => {}); } catch (e) {} }
+}
+['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, bgmUnlock, { passive: true }));
 const bgmKeyOf = name => name.indexOf('spin') === 0 ? 'bgm:' + name : (name.indexOf('theme:') === 0 ? 'bgm:' + name.slice(6) : null);
 function bgmCustomUrl(name) {
   if (name === 'fever') return BGM_DEFAULT_URL.fever || '';
@@ -1777,10 +1789,7 @@ function bgmCustomUrl(name) {
 }
 function bgmStop() {
   if (bgm.timer) clearInterval(bgm.timer); bgm.timer = null; bgm.name = null;
-  if (bgmAudio.el) {   // 前の曲は短くフェードして必ず止める（次の曲とは別要素なので重ならない）
-    const a = bgmAudio.el; bgmAudio.el = null; let v = a.volume;
-    const f = setInterval(() => { v -= 0.2; if (v <= 0.02) { clearInterval(f); try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {} } else { try { a.volume = v; } catch (e) {} } }, 25);
-  }
+  if (bgmAudio.el) { try { bgmAudio.el.pause(); } catch (e) {} bgmAudio.el = null; }   // 要素は捨てずに止めるだけ（スマホで『自動再生ブロック』にならないよう、使い回す）
 }
 /* 通常変動曲の選択。①固定／②固定／期待度連動（変動ごとに1曲だけ）。期待度は演出の強さから判定する */
 function spinExpect(P, res) {
@@ -1802,9 +1811,11 @@ function bgmPlay(name) {
   const url = bgmCustomUrl(name);
   if (url) {
     try {
-      const a = new Audio(url); a.loop = true; a.volume = snd.mute ? 0 : Math.min(1, snd.bgm);
-      if (name.indexOf('spin') === 0 && typeof supportOn === 'function' && supportOn()) { a.preservesPitch = false; a.mozPreservesPitch = false; a.webkitPreservesPitch = false; a.playbackRate = SPIN_FAST_RATE; }   // 時短中は変動が速いので、曲もピッチを上げて速くする
-      const p = a.play(); if (p && p.catch) p.catch(() => {});
+      let a = bgmEls[name]; if (!a || a.dataset.u !== url) { a = new Audio(url); a.dataset.u = url; a.preload = 'auto'; bgmEls[name] = a; }
+      a.loop = true; a.volume = snd.mute ? 0 : Math.min(1, snd.bgm); a.muted = false; try { a.currentTime = 0; } catch (e) {}
+      a.preservesPitch = true; a.mozPreservesPitch = true; a.webkitPreservesPitch = true; a.playbackRate = 1;
+      if (name.indexOf('spin') === 0 && typeof supportOn === 'function' && supportOn()) { a.preservesPitch = false; a.mozPreservesPitch = false; a.webkitPreservesPitch = false; a.playbackRate = SPIN_FAST_RATE; }   // 時短中は変動が速いので、曲も速く（ピッチも上がる）
+      const p = a.play(); if (p && p.catch) p.catch(() => { bgmBlocked = true; });   // ブロックされたら、次のタップで鳴らし直す
       bgmAudio.el = a; return;
     } catch (e) { bgmAudio.el = null; }   // 失敗したら内蔵曲にフォールバック
   }
