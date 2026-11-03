@@ -968,15 +968,68 @@ function sfxFire() {
   tone(2300, 0.03, 'sine', 0.12, 1800, 0.27);   // 盤面に出る小さなカチッ
 }
 function sfxNail(v) {
-  /* 本物の釘：鋼の玉が真ちゅうの釘に当たる「カッ」というクリックに、短く鳴る金属の「チン」と、盤の木・アクリルに響く小さな「コッ」を重ねる。音程は毎回ばらす */
+  /* 本物の釘：鋼の玉が真ちゅうの釘に当たる「カッ」というクリックに、短く鳴る金属の「チン」と、盤に響く小さな「コッ」を重ねる。音程は毎回ばらす */
   const now = performance.now(); if (now - snd.lastNail < 16) return; snd.lastNail = now;
   const s = Math.min(1, v / 700), g = 0.26 + s * 0.3, f = 2600 + Math.random() * 1500;
-  noise(0.012, g * 1.4, 4200);                                  // 当たった瞬間の鋭いクリック
-  tone(f, 0.075, 'sine', g, f * 0.985);                         // 釘が鳴る基本の音
-  tone(f * 2.76, 0.05, 'sine', g * 0.55); tone(f * 5.4, 0.03, 'sine', g * 0.3);   // 金属らしい非整数倍の倍音
-  tone(900 + Math.random() * 250, 0.035, 'triangle', g * 0.7, 520);   // 盤に響く軽いコッ
-  if (s > 0.45) tone(f * 1.5, 0.11, 'sine', g * 0.3);           // 強く当たると余韻が少し長い
+  noise(0.012, g * 1.4, 4200);
+  tone(f, 0.075, 'sine', g, f * 0.985);
+  tone(f * 2.76, 0.05, 'sine', g * 0.55); tone(f * 5.4, 0.03, 'sine', g * 0.3);
+  tone(900 + Math.random() * 250, 0.035, 'triangle', g * 0.7, 520);
+  if (s > 0.45) tone(f * 1.5, 0.11, 'sine', g * 0.3);
 }
+function sfxChucker() { [880, 1175, 1568].forEach((f, i) => tone(f, 0.16, 'square', 0.18, 0, i * 0.07)); }
+function sfxReelStop(i) { tone(420 + i * 90, 0.07, 'square', 0.2); }
+function sfxReach() { [660, 880, 1100].forEach((f, i) => tone(f, 0.18, 'sawtooth', 0.16, f * 1.3, i * 0.12)); }
+function sfxSuper() { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'square', 0.2, 0, i * 0.09)); noise(0.3, 0.15, 3000); }
+function sfxHot() { tone(90, 0.7, 'sawtooth', 0.45, 45); for (let i = 0; i < 4; i++) { noise(0.12, 0.35, 900); tone(1400, 0.1, 'square', 0.2, 700, 0.15 + i * 0.14); } }
+function sfxYk() { tone(988, 0.07, 'square', 0.16); tone(1318, 0.1, 'square', 0.16, 0, 0.07); }
+function sfxChance() { [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.14, 'triangle', 0.26, 0, i * 0.07)); }
+function sfxChara() { [523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.3, f * 1.5, i * 0.08)); }
+function sfxNiji() { [523, 659, 784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.3, 'sine', 0.3, 0, i * 0.08)); noise(0.5, 0.12, 5000); }
+function sfxBlackout() { tone(90, 0.9, 'sawtooth', 0.4, 38); noise(0.35, 0.18, 300); }
+function sfxRays() { tone(200, 1.5, 'sawtooth', 0.14, 1800); tone(400, 1.5, 'triangle', 0.2, 2400); }
+function sfxFanfare() { [[523, 0], [523, 0.14], [523, 0.28], [659, 0.42], [784, 0.62], [659, 0.82], [784, 0.96], [1047, 1.16]].forEach(([f, d]) => { tone(f, 0.3, 'square', 0.2, 0, d); tone(f / 2, 0.3, 'triangle', 0.28, 0, d); }); }
+function sfxRound() { [659, 784, 1047].forEach((f, i) => tone(f, 0.12, 'square', 0.2, 0, i * 0.06)); }
+function sfxRoundEnd() { tone(784, 0.12, 'triangle', 0.3); tone(523, 0.2, 'triangle', 0.3, 0, 0.1); }
+function sfxCatch() { tone(1200 + Math.random() * 300, 0.06, 'square', 0.14); tone(1800, 0.06, 'square', 0.1, 0, 0.05); }
+function sfxFireworks() { noise(0.25, 0.28, 400); tone(1500, 0.18, 'sine', 0.2, 300); }
+/* BGM（WebAudioで作る簡易ループ。SEとは別音量） */
+const BGMS = {
+  bonus:   { ms: 200, lead: [72,76,79,76,72,76,79,84, 77,81,84,81,79,76,74,79], bass: [48,53,55,48], type: 'square' },
+  premium: { ms: 150, lead: [84,88,91,88,84,88,91,96, 83,86,91,86,83,86,91,95], bass: [48,52,55,50], type: 'square' },
+  special: { ms: 220, lead: [69,72,76,72,69,72,76,81, 67,71,74,71,67,71,74,79], bass: [45,45,43,43], type: 'sawtooth' },
+};
+const PROC_GAIN = { bonus: 3.6, premium: 3.6, special: 4.4 };   // 測定：曲（約-24dBFS）にそろえる倍率
+const bgm = { timer: null, name: null, step: 0 };
+const mhz = m => 440 * Math.pow(2, (m - 69) / 12);
+function sfxWin() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'square', 0.22, 0, i * 0.11)); }
+
+let angleDeg = 0;            // ハンドル角度 (-135〜135)
+let firing = false, autoFire = false, fireTimer = 0;
+
+/* ---------- 物理 ---------- */
+function powerOf() { return (angleDeg + 135) / 270; }
+function speedOf() { return CONFIG.powerMin + powerOf() * (CONFIG.powerMax - CONFIG.powerMin); }
+
+const needSide = () => (MODE.k === 'bonus' || (typeof supportOn === 'function' && supportOn())) ? 'R' : 'L';
+let lastSideWarn = 0;
+function sideWarn() {
+  const sd = sideOf(), need = needSide(), now = performance.now();
+  if (sd === 'M' || sd === need || now - lastSideWarn < 3500) return;
+  lastSideWarn = now;
+  toast(need === 'R' ? '右打ち！ 左に打つと玉がムダになるよ' : '左打ち！ 右に打つとヘソに入らないよ');
+}
+function fireBall() {
+  if (!playing || (state.have <= 0 && !inBonus() && !debugMode)) return false;
+  if (balls.length >= CONFIG.maxBallsOnBoard) return false;
+  const v = speedOf() * (1 + (Math.random() - 0.5) * 0.03);
+  balls.push({ x: 20 + Math.random() * 3, y: H - 30, vx: v * LANE_S + (Math.random() - 0.5) * 12, vy: -v, slow: 0 });
+  if (!inBonus() && !debugMode) state.have--;
+  state.shot++; dm('shot');
+  sfxFire(); sideWarn();
+  return true;
+}
+
 function hitCircle(b, cx, cy, cr, e, jitter, isNail) {
   const dx = b.x - cx, dy = b.y - cy, minD = R + cr;
   const d2 = dx * dx + dy * dy;
@@ -2195,6 +2248,18 @@ function openShare() {
   if (tw) tw.addEventListener('click', () => { window.open('https://twitter.com/intent/tweet?text=' + encodeURIComponent(shareText()), '_blank', 'noopener'); });
 }
 /* ---------- 設定（音・表示・確率・ほか を1か所に） ---------- */
+/* 最新版に読み込み直す（セーブは残す）。画面右上の「更新」ボタンと設定の両方から使う */
+function reloadLatest() {
+  try { saveGame(); } catch (e) {} wiped = true;
+  const go = () => { location.replace(location.pathname + '?v=' + Date.now()); };
+  try { if (window.caches && caches.keys) caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go, go); else go(); } catch (e) { go(); }
+}
+(function () {
+  const b = document.createElement('button'); b.id = 'updBtn'; b.type = 'button'; b.textContent = '↻ 更新';
+  b.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);right:8px;z-index:99999;flex:none;width:auto;min-height:0;height:28px;padding:0 10px;font-size:12px;font-weight:800;border-radius:14px;border:1.5px solid #a87b12;background:rgba(255,248,224,.92);color:#5a3c00;box-shadow:0 1px 4px rgba(0,0,0,.3)';
+  b.addEventListener('click', () => { if (confirm('最新版に読み込み直すよ。セーブは消えないよ。いい？')) reloadLatest(); });
+  document.body.appendChild(b);
+})();
 function openSettings() {
   const isPlay = !!playing;
   const row = (t, inner) => `<div class="bgmh">${t}</div>${inner}`;
@@ -2210,11 +2275,7 @@ function openSettings() {
   openSub(h + closeBtn);
   const box = $('subBox');
   const again = () => openSettings();
-  $('stReload').onclick = () => {
-    saveGame(); wiped = true;
-    const go = () => { location.replace(location.pathname + '?v=' + Date.now()); };
-    try { if (window.caches && caches.keys) caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go, go); else go(); } catch (e) { go(); }
-  };
+  $('stReload').onclick = reloadLatest;
   $('stBak').onclick = () => {
     saveGame(); let code = '';
     try { const o = {}; Object.keys(localStorage).filter(k => k.indexOf('bonutopia_') === 0 || k === 'pachi_prob').forEach(k => { o[k] = localStorage.getItem(k); }); code = btoa(unescape(encodeURIComponent(JSON.stringify(o)))); } catch (e) {}
