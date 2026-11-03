@@ -2214,10 +2214,36 @@ function openSettings() {
   if (isPlay) h += row('台の確率（大当たり）', `<div class="bgmsel" style="grid-template-columns:repeat(3,1fr)">${[10, 99, 199, 319, 399].map(p => `<button data-prob="${p}" class="${LOTTERY.prob === p ? 'on' : ''}">1/${p}${p === 10 ? '<small>テスト</small>' : ''}</button>`).join('')}</div><div style="font-size:11px;color:#8a6a30;margin-top:4px">変えると、次の入賞から反映されるよ。</div>`);
   else h += row('台の確率（大当たり）', `<div style="font-size:12px;color:#6b4a1a">いまは 1/${LOTTERY.prob}。遊んでいる最中に、画面の「🎰 確率」から変えられるよ。</div>`);
   h += row('ほか', `<div class="bgmsel" style="grid-template-columns:repeat(2,1fr)"><button id="stHow">❓ 遊び方</button><button id="stData">📊 データ</button><button id="stCust">🎨 カスタム</button><button id="stShare">📸 シェア</button></div>`);
+  h += `<div class="bgmsel" style="grid-template-columns:repeat(2,1fr);margin-top:12px"><button id="stBak">データのバックアップ</button><button id="stReload">最新版に読み込み直す</button></div><div style="font-size:11px;color:#8a6a30;margin-top:4px;line-height:1.5">バックアップのコードを保存しておけば、アプリを入れ直してもデータをもどせるよ。「読み込み直す」はデータを消さずに最新のページを取り直すよ。</div>`;
   h += `<div style="margin-top:12px;text-align:center"><button id="stWipe" style="flex:none;width:100%;min-height:38px;border-radius:10px;border:2px solid #b3261e;background:#fff;color:#b3261e;font-weight:800">🗑 データを削除</button></div>`;
   openSub(h + closeBtn);
   const box = $('subBox');
   const again = () => openSettings();
+  $('stReload').onclick = () => {
+    saveGame(); wiped = true;
+    const go = () => { location.replace(location.pathname + '?v=' + Date.now()); };
+    try { if (window.caches && caches.keys) caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go, go); else go(); } catch (e) { go(); }
+  };
+  $('stBak').onclick = () => {
+    saveGame(); let code = '';
+    try { const o = {}; Object.keys(localStorage).filter(k => k.indexOf('bonutopia_') === 0 || k === 'pachi_prob').forEach(k => { o[k] = localStorage.getItem(k); }); code = btoa(unescape(encodeURIComponent(JSON.stringify(o)))); } catch (e) {}
+    openSub(`<h2 style="font-size:22px">データのバックアップ</h2><div style="font-size:13px;line-height:1.6;margin:6px 0">下のコードをコピーして、メモなどに保存しておいてね。もどすときは、下の「読み込む」の欄にはりつけるよ。</div>
+      <textarea id="bakOut" readonly style="width:100%;height:90px;font-size:11px;border-radius:8px;border:1px solid #a87b12;padding:6px;box-sizing:border-box;user-select:text;-webkit-user-select:text">${code}</textarea>
+      <button id="bakCopy" style="flex:none;width:100%;min-height:38px;margin-top:6px">コードをコピー</button>
+      <div class="bgmh">読み込む（いまのデータは上書きされるよ）</div>
+      <textarea id="bakIn" placeholder="ここにコードをはりつけ" style="width:100%;height:70px;font-size:11px;border-radius:8px;border:1px solid #a87b12;padding:6px;box-sizing:border-box;user-select:text;-webkit-user-select:text"></textarea>
+      <button id="bakGo" style="flex:none;width:100%;min-height:38px;margin-top:6px">読み込む</button>
+      <button id="bakBack" style="flex:none;width:100%;min-height:38px;margin-top:6px">もどる</button>`);
+    $('bakBack').onclick = () => openSettings();
+    $('bakCopy').onclick = () => { const t = $('bakOut'); t.select(); try { navigator.clipboard.writeText(t.value).then(() => toast('コピーしたよ'), () => { document.execCommand('copy'); toast('コピーしたよ'); }); } catch (e) { try { document.execCommand('copy'); toast('コピーしたよ'); } catch (x) {} } };
+    $('bakGo').onclick = () => {
+      let o; try { o = JSON.parse(decodeURIComponent(escape(atob($('bakIn').value.trim())))); } catch (e) { toast('コードが正しくないみたい'); return; }
+      if (!o || typeof o !== 'object' || !o.bonutopia_v1) { toast('コードが正しくないみたい'); return; }
+      wiped = true;
+      try { Object.keys(o).filter(k => k.indexOf('bonutopia_') === 0 || k === 'pachi_prob').forEach(k => localStorage.setItem(k, o[k])); } catch (e) {}
+      location.reload();
+    };
+  };
   $('stWipe').onclick = () => {
     openSub(`<h2 style="font-size:22px;color:#b3261e">データを削除</h2><div style="font-size:14px;line-height:1.7;margin:8px 0">持ち玉、ボンコイン、図鑑、ガチャで集めたカード、ミッション、記録、カスタムの設定が<b>すべて消えて、元にもどせないよ。</b>本当に消す？</div><button id="wipeGo" style="flex:none;width:100%;min-height:42px;border-radius:10px;border:2px solid #b3261e;background:#b3261e;color:#fff;font-weight:900">ぜんぶ消す</button><button id="wipeNo" style="flex:none;width:100%;min-height:42px;margin-top:8px;border-radius:10px">やめる</button>`);
     $('wipeNo').onclick = () => openSettings();
