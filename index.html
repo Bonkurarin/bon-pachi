@@ -370,7 +370,8 @@ function startNextSpin() {
   dm('spin');
   lcd.res = state.queue.shift(); lcd.plan = planDirection(lcd.res);
   lcd.phase = 'spin'; lcd.t = 0; lcd.stopped = [false, false, false]; lcd.fired = {}; lcd.skipped = false; state.spins++; G.life.spins++;
-  lcd.spinBgm = chooseSpinBgm(lcd.plan, lcd.res); bgmPlay(lcd.spinBgm);   // 通常変動曲：ルーレットが回っている間だけ（1変動1曲）
+  if ((bgm.name || '').indexOf('spin') === 0 && bgmAudio.el && !bgmAudio.el.paused && !lcd.skipped) lcd.spinBgm = bgm.name;   // 前の変動の曲が流れたままなら、そのまま続ける
+  else { lcd.spinBgm = chooseSpinBgm(lcd.plan, lcd.res); bgmPlay(lcd.spinBgm); }   // 通常変動曲：ルーレットが回っている間だけ（1変動1曲）
 }
 function onStart() {
   sfxChucker();
@@ -403,7 +404,7 @@ function updateLCD(dt) {
     P.stops.forEach((st, i) => { if (!lcd.stopped[i] && t >= st) { lcd.stopped[i] = true; if (!lcd.skipped) sfxReelStop(i); } });
     if (P.reach && !lcd.skipped && t >= P.R) once('reach', () => { dexMark('rc', P.reach); if (P.reach === 'bon' || P.reach === 'coop') bonSeen(P.chars[0]); if (P.reach === 'niji') bonSeen(6); bgmStop(); sfxReach(); if (P.reach === 'special') bgmPlay('special'); if (P.reach === 'niji') sfxNiji(); });
     if (lcd.stopped[0] && lcd.stopped[1] && lcd.stopped[2]) {
-      bgmStop();
+      if (lcd.res.win || state.queue.length === 0 || (bgm.name || '').indexOf('spin') !== 0) bgmStop();   // 連続で回転するとき（ハズレで次の保留がある）は、曲を止めずに続ける
       P.sym.forEach(x => { G.dex.symSeen[x] = 1; });
       if (lcd.res.win) { state.wins++; onWin(lcd.res); dexMark('sp', P.premium ? 'premium' : 'win'); if (P.premium) G.rec.premium++; if (lcd.res.symIdx === SEVEN) dexMark('sp', 'seven'); lcd.phase = 'intro'; lcd.t = 0; lcd.fired = {}; }
       else { onLose(); lcd.phase = 'result'; lcd.t = 0; }
