@@ -2217,6 +2217,58 @@ function openData() {
 function shareText() {
   return `BON UTOPIA（無料のパチンコシミュレーター）で、最高${G.rec.bestChain || 0}連チャン！ 大当たり${G.life.wins || 0}回。 夢も、希望も、大当たりも！ #BONUTOPIA\nhttps://bonkurarin.github.io/bon-pachi/`;
 }
+/* 推しボン：大当たり中に出るボン。「おまかせ」なら直近に当たった図柄のボン（なければにじボン） */
+function oshiBon() {
+  if (typeof bgmCfg.sel === 'number') return bgmCfg.sel;
+  const h = Array.isArray(G.hist) ? G.hist : [], r = h[h.length - 1], d = r && SYM_DEFS[r.sym];
+  return d && d.kind === 'bon' ? d.bon : 6;
+}
+/* セリフ：条件ごとに複数。zero=まだ大当たり0回 / low=0〜1連 / mid=2〜4連 / high=5連〜 / big=1回の出玉が多い。{n}は最高連チャン数 */
+const OSHI_LINES = [
+  { zero: ['まだ当たってないの！？つ、次こそよ！', 'ふん、あたしが付いてるんだから当たるわよ！', 'ほら、さっさと打ちなさいよ！'],
+    low: ['つ、次こそ当ててやるわよ！', 'べ、別に悔しくないんだからね！', 'もう一回！絶対もう一回よ！'],
+    mid: ['まあまあね…べつに嬉しくないし！', '{n}連チャンくらい、あたしなら当然よ！', 'ちょ、ちょっとは褒めてあげてもいいわよ！'],
+    high: ['{n}連チャン！？ふん、当然でしょ！', '{n}連チャン…ま、まあ悪くないわね！', 'あたしのおかげで{n}連チャンよ！感謝しなさい！'],
+    big: ['この出玉、あたしのおかげだからね！', 'ふん、玉があふれてるじゃない！', 'こんなに出たの！？やるじゃない！'] },
+  { zero: ['まだ当たってない！いっしょにがんばろ！', 'はじめまして！当たるまで応援するよ！', 'だいじょうぶ、きっと当たるよ！'],
+    low: ['あそんでくれて ありがとう！', 'また当たるよ！えいえいおー！', 'たのしいね！もっと回そう！'],
+    mid: ['やったー！また当たったよ！', '{n}連チャン！いいかんじ！', 'わーい！みんなでお祝いしよう！'],
+    high: ['{n}連チャン！やったー！みんなだいすき！', '{n}連チャンってすごくない！？', 'ぴかぴか！{n}連チャン、さいこう！'],
+    big: ['玉がいっぱい！うれしい！', 'わあ、こんなに出たよ！やったー！', 'この出玉、みんなに見せたいな！'] },
+  { zero: ['こわくない…こわくないよね…？', 'ひょえ…まだ当たってないよぅ…', 'ぼ、ぼく、応援してるからね…！'],
+    low: ['ひょえ、当たっちゃった…！', 'つ、次も当たるかな…どきどき…', 'うぅ…でも、がんばる…！'],
+    mid: ['ひょえ〜！{n}連チャン！？', 'あわわ…当たりが続いてるよぅ…！', 'ぼく、ちょっとすごいかも…！？'],
+    high: ['ひょえ〜！{n}連チャン！？むりむり…すごい！', '{n}連チャン…夢じゃないよね…！？', 'ひょえええ！{n}連チャンだよぉ！'],
+    big: ['ひょえ…玉がこんなに…落ち着かないよぉ', 'こ、こんなに出ていいの…！？', 'ひょえ〜！出玉がすごいよぉ！'] },
+  { zero: ['おなかすいたぁ…まだ当たってないよ', 'あたったらおにぎり食べよ〜', 'もぐもぐ…あたるまで待つよ'],
+    low: ['おいしい当たり、もぐもぐ…！', 'おなかすいたぁ…次は当たるかな', 'おにぎり食べて、もう一回！'],
+    mid: ['当たったらおにぎりがおいしい〜！', '{n}連チャン、もぐもぐ…いい感じ！', 'ふふ、ごきげん！もぐもぐ！'],
+    high: ['{n}連チャン…おなかいっぱい！サイコ〜！', '{n}連チャン！おにぎり山盛りだぁ！', 'もぐもぐ…{n}連チャン、おいしい〜！'],
+    big: ['玉がおにぎりみたいに山盛りだぁ！', 'おなかも玉もいっぱい！サイコ〜！', 'こんなに出たら、ごちそうだね！'] },
+  { zero: ['むにゃ…まだ当たってないの…？', 'ふわぁ…当たるまでねてていい…？', 'zzz…あ、おはよう…'],
+    low: ['むにゃ…まだねる…', 'ふわぁ…当たってたの…？', 'ねむねむ…でも、もうちょっとだけ…'],
+    mid: ['ふわぁ…あたり…うれしいねぇ…', '{n}連チャン…むにゃ…いいねぇ…', 'ねむいけど…ちょっとうれしい…'],
+    high: ['{n}連チャン…ねむねむ…すごい…', '{n}連チャン…夢みたい…夢かも…', 'ふわぁ…{n}連チャン…おどろいた…'],
+    big: ['玉がふかふかの布団みたい…ねむい…', 'こんなに出たの…むにゃ…すごい…', 'ふわぁ…ごちそうさま…'] },
+  { zero: ['まだ当たってないけど…がんばる…！', 'どきどき…はじめての当たり、待ってる…', 'はずかしいけど、応援するね…！'],
+    low: ['はずかしい…でもがんばる…！', 'どきどき…当たっちゃった…', 'つ、次も当たるといいな…'],
+    mid: ['えへへ…当たってうれしい…', '{n}連チャン…どきどきする…', 'み、見られてると はずかしい…'],
+    high: ['{n}連チャン…ほめすぎだよぉ…', '{n}連チャン…夢みたい…どきどき…', 'こ、こんなに当たるなんて…はずかしい…'],
+    big: ['こんなに出たの…はずかしいよぉ…', 'どきどき…玉がいっぱい…！', 'み、みんなに見せるの…はずかしい…'] },
+  { zero: ['夢も、希望も、大当たりも！まずは一発なのだ！', '我輩が見守っておるぞ！安心して回すがよい！', 'お主の初当たり、楽しみであるな！'],
+    low: ['夢も、希望も、大当たりも！', '我輩の勝ちなのだ！', 'うむ、悪くないぞ！次も参ろう！'],
+    mid: ['うむ、{n}連チャン。上出来である！', '我輩の言った通りであろう！', 'お主、なかなかやるではないか！'],
+    high: ['我輩の{n}連チャン、見事であろう！', '{n}連チャン！我輩、感服したぞ！', '{n}連チャン…ユートピアの住人であるな！'],
+    big: ['この出玉、まさに大当たりなのだ！', '玉があふれておるぞ！我輩も鼻が高い！', 'うむ！この出玉、語り継ぐがよい！'] }];
+let oshiLast = '';
+function oshiLine(bi, n) {
+  const o = OSHI_LINES[bi], hist = Array.isArray(G.hist) ? G.hist : [], best = hist.reduce((m, h) => Math.max(m, h.g | 0), 0);
+  let pool = (G.life.wins || 0) === 0 ? o.zero : n >= 5 ? o.high : n >= 2 ? o.mid : o.low;
+  if ((G.life.wins || 0) > 0 && best >= 2000) pool = pool.concat(o.big, o.big);   // 出玉が多いときは「出玉」のセリフも混ぜる
+  let t = pool[Math.floor(Math.random() * pool.length)];
+  if (pool.length > 1 && t === oshiLast) t = pool[(pool.indexOf(t) + 1) % pool.length];
+  oshiLast = t; return t.replace(/\{n\}/g, n);
+}
 function makeShareCanvas() {
   const W = 1200, H = 630, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d');
   const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#2a1a4e'); g.addColorStop(0.55, '#5a2a7a'); g.addColorStop(1, '#e64ab8'); c.fillStyle = g; c.fillRect(0, 0, W, H);
@@ -2234,7 +2286,21 @@ function makeShareCanvas() {
   });
   c.font = '600 24px "Zen Maru Gothic", sans-serif'; c.fillStyle = '#ffffffb0'; c.fillText('完全無料・課金なし・換金なし', 64, 596);
   c.font = '600 22px "Zen Maru Gothic", sans-serif'; c.textAlign = 'right'; c.fillText('bonkurarin.github.io/bon-pachi', W - 40, 596); c.textAlign = 'left';
-  const im = NIJI_CHIBI; if (im && im.complete && im.naturalWidth) { const h = 470, w = h * im.naturalWidth / im.naturalHeight; c.drawImage(im, 880 - w / 2, 590 - h, w, h); }
+  { // 推しボンがセリフを言う
+    const bi = oshiBon(), n = G.rec.bestChain || 0, col = bi === 6 ? '#9b6bff' : BON_C[bi][2];
+    let im = bi === 6 ? NIJI_CHIBI : (artRaw(bi, 's', (G.life.wins || 0) % 4) || symImgs[bi]);
+    if (im && im.complete && im.naturalWidth) { const h = 340, w = Math.min(430, h * im.naturalWidth / im.naturalHeight), hh = w * im.naturalHeight / im.naturalWidth; c.drawImage(im, 940 - w / 2, 600 - hh, w, hh); }
+    const line = oshiLine(bi, n), bx = 720, by = 60, bw = 450, bh = 170;
+    c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 14; c.fillStyle = '#fff'; c.strokeStyle = col; c.lineWidth = 6;
+    roundRect(c, bx, by, bw, bh, 28); c.fill(); c.shadowBlur = 0; c.stroke();
+    c.beginPath(); c.moveTo(bx + 250, by + bh - 2); c.lineTo(bx + 290, by + bh + 52); c.lineTo(bx + 320, by + bh - 2); c.closePath(); c.fillStyle = '#fff'; c.fill();
+    c.beginPath(); c.moveTo(bx + 250, by + bh); c.lineTo(bx + 290, by + bh + 52); c.lineTo(bx + 320, by + bh); c.strokeStyle = col; c.stroke(); c.restore();
+    c.fillStyle = '#fff'; c.fillRect(bx + 256, by + bh - 6, 58, 10);
+    c.font = '900 32px "Zen Maru Gothic", sans-serif'; c.fillStyle = '#3a2a4a'; c.textAlign = 'center';
+    const lines = []; let cur = ''; for (const ch of line) { if (c.measureText(cur + ch).width > bw - 50) { lines.push(cur); cur = ''; } cur += ch; } lines.push(cur);
+    const ly0 = by + bh / 2 - (lines.length - 1) * 22 + 10; lines.forEach((t, i) => c.fillText(t, bx + bw / 2, ly0 + i * 44));
+    c.textAlign = 'left';
+  }
   return cv;
 }
 function openShare() {
@@ -2724,6 +2790,10 @@ function openCustom(tab) {
   } else if (tab === 'look') {
     const grp = (ttl, attr, cur, tbl, sw) => { h += `<div class="bgmh">${ttl}</div><div class="bgmsel" style="grid-template-columns:repeat(3,1fr)">` + Object.keys(tbl).map(k => `<button data-lk="${attr}:${k}" class="${cur === k ? 'on' : ''}">${sw ? sw(k) : ''}${Array.isArray(tbl[k]) ? tbl[k][0] : tbl[k]}</button>`).join('') + '</div>'; };
     const dot = col => `<span style="display:block;height:18px;border-radius:9px;margin-bottom:3px;background:${col}"></span>`;
+    h += '<div class="bgmh">推しボン（大当たり中に出る子。シェア画像ではこの子がセリフを言うよ）</div><div class="bgmsel" style="grid-template-columns:repeat(2,1fr)">';
+    h += opt('oshi', 'auto', bgmCfg.sel === 'auto', 'おまかせ', '当たった図柄の子', false);
+    for (let i = 0; i < 7; i++) h += opt('oshi', i, bgmCfg.sel === i, SYMBOL_NAMES[i], '', !bonOpen(i));
+    h += '</div>';
     grp('台の枠', 'frame', custom.frame, FRAME_STYLE);
     grp('盤面の動く飾り（ボンのシャボン玉）', 'deco', custom.deco, { on: 'あり', off: 'なし' });
     grp('図柄（ボン）の見せ方（見た目だけ）', 'sym', custom.sym, SYM_STYLE);
@@ -2749,6 +2819,7 @@ function openCustom(tab) {
     const [a, v] = b.dataset.lk.split(':'); custom[a] = v; saveCustom();
     if (a === 'ball' || a === 'nail' || a === 'frame') renderStatic(); if (a === 'ui') applyUiTheme(); again();
   });
+  box.querySelectorAll('[data-oshi]').forEach(b => b.onclick = () => { bgmCfg.sel = b.dataset.oshi === 'auto' ? 'auto' : +b.dataset.oshi; saveBgmCfg(); again(); });
   box.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => { custom.hold = b.dataset.hold; saveCustom(); again(); });
   ['lcd', 'board'].forEach(sub => {
     box.querySelectorAll(`[data-skin-${sub}]`).forEach(b => b.onclick = () => { custom[sub] = b.getAttribute(`data-skin-${sub}`); saveCustom(); if (sub === 'board' && typeof renderStatic === 'function') renderStatic(); again(); });
