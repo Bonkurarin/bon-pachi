@@ -909,7 +909,8 @@ function oshiDecoBon() {
   if (bgmCfg.sel === 'auto' && !(Array.isArray(G.hist) && G.hist.length)) return -1;
   return oshiBon();
 }
-function oshiPoseN() { let n = artVar; try { if (lcd.phase === 'spin' && lcd.plan) lcd.plan.yokoku.forEach(y => { if (lcd.t >= y.at) n++; }); } catch (e) {} return n; }
+let oshiN = 0, oshiAt = 0;   // 推しボンの立ち絵：1分に1回だけポーズを変える
+function oshiPoseN() { const now = Date.now(); if (!oshiAt) oshiAt = now; else if (now - oshiAt >= 60000) { oshiN++; oshiAt = now; } return oshiN + artSalt; }
 function oshiImg(bi, kind, n) {
   if (bi === 6) { const k = ((n % 3) + 3) % 3; const im = kind === 'p' ? NIJI_POSES[k] : NIJI_CHIBI; return im && im.complete && im.naturalWidth ? im : null; }
   return artRaw(bi, kind, n) || (kind === 's' ? symImgs[bi] : null);
@@ -1085,7 +1086,11 @@ let firing = false, autoFire = false, fireTimer = 0;
 
 /* ---------- 物理 ---------- */
 function powerOf() { return (angleDeg + 135) / 270; }
-function speedOf() { return CONFIG.powerMin + powerOf() * (CONFIG.powerMax - CONFIG.powerMin); }
+function speedOf() {
+  /* 左打ち(強さ0.6未満)は盤の左をまわる速さ(〜1380)、右打ち(0.66以上)は上を越えて右へ行く速さ(1420〜)。この境目は変えない */
+  const p = powerOf();
+  return p < 0.63 ? 1000 + (p / 0.63) * 380 : 1420 + (p - 0.63) / 0.37 * (CONFIG.powerMax - 1420);
+}
 
 const needSide = () => (MODE.k === 'bonus' || (typeof supportOn === 'function' && supportOn())) ? 'R' : 'L';
 let lastSideWarn = 0;
@@ -1781,7 +1786,7 @@ function togglePcFull() { try { if (document.fullscreenElement) document.exitFul
       $t('pcSpin', document.getElementById('sSpin').textContent); $t('pcWin', document.getElementById('sWin').textContent);
       const bi = oshiBon(), n = oshiPoseN(), key = bi + ':' + n, img = document.getElementById('pcOshi');
       if (key !== lastKey) { lastKey = key; const src = howBonSrc(bi, n); if (src && img.getAttribute('src') !== src) img.src = src; }
-      if (bi !== lastBi || (n !== lastLineAt && n % 4 === 0)) { lastBi = bi; lastLineAt = n; $t('pcSay', oshiLine(bi, G.rec.bestChain || 0)); }
+      if (bi !== lastBi || n !== lastLineAt) { lastBi = bi; lastLineAt = n; $t('pcSay', oshiLine(bi, G.rec.bestChain || 0)); }
     } catch (e) {}
   }, 300);
   document.getElementById('pcFull').addEventListener('click', togglePcFull);
