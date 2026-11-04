@@ -92,6 +92,27 @@
   #sideRow button.sel { background: linear-gradient(#7fd0ff, #2f8ae0); border-color: #1b5fa8; box-shadow: 0 2px 0 #1b5fa8; text-shadow: 0 1px 0 rgba(0,0,0,.35); }
   #sideRow button#bR.sel { background: linear-gradient(#ffd45a, #ff9a00); border-color: #b86a00; box-shadow: 0 2px 0 #b86a00; }
   #pw.rt { color: #c76a00; } #pw.lt { color: #1b5fa8; }
+
+  /* ===== PC向け：横に広い画面では、台の左右に情報パネルを出す ===== */
+  #pcL, #pcR { display: none; }
+  @media (min-width: 1100px) and (min-height: 600px) {
+    #pcL, #pcR { display: flex; position: fixed; top: 14px; bottom: 14px; width: calc((100vw - 560px) / 2 - 36px); max-width: 360px; flex-direction: column; gap: 12px; z-index: 1; color: #3b2a00; touch-action: auto; }
+    #pcL { left: 18px; } #pcR { right: 18px; }
+    .pcCard { background: linear-gradient(#fffefa, #f3e5b8); border: 3px solid #d9ab3c; border-radius: 18px; padding: 12px 14px; box-shadow: 0 8px 22px rgba(0,0,0,.4); font-size: 13px; line-height: 1.6; }
+    .pcCard h3 { margin: 0 0 6px; font-size: 14px; font-weight: 900; color: #b05a00; letter-spacing: .06em; }
+    #pcOshiBox { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; }
+    #pcOshi { max-height: 100%; max-width: 100%; min-height: 0; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); transition: opacity .3s; }
+    #pcSay { background: #fff; border: 3px solid #d9ab3c; border-radius: 16px; padding: 8px 12px; font-weight: 800; font-size: 14px; line-height: 1.5; margin-bottom: 8px; position: relative; }
+    #pcSay::after { content: ""; position: absolute; left: 50%; bottom: -10px; margin-left: -8px; border: 8px solid transparent; border-top-color: #d9ab3c; border-bottom: 0; }
+    .pcStats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+    .pcStats div { background: rgba(255,255,255,.7); border: 1px solid #d3b062; border-radius: 8px; padding: 2px 8px; font-size: 11px; color: #7a5a10; }
+    .pcStats b { display: block; font-size: 17px; color: #2a1a00; font-variant-numeric: tabular-nums; }
+    .pcKeys { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; align-items: center; }
+    .pcKeys kbd { display: inline-block; min-width: 30px; text-align: center; padding: 0 7px; border: 1.5px solid #a87b12; border-bottom-width: 3px; border-radius: 7px; background: #fffbe8; font: 800 12px "Zen Maru Gothic", sans-serif; color: #4a3200; }
+    .pcBtns { display: flex; flex-direction: column; gap: 7px; margin-top: auto; }
+    .pcBtns button { flex: none; min-height: 40px; font-size: 13px; }
+    #app { max-width: 600px; }
+  }
   /* ===== オーバーレイ ===== */
   .ov { position: fixed; inset: 0; z-index: 50; background: rgba(15,6,40,.88); display: none; align-items: center; justify-content: center; padding: 16px; }
   .ov.show { display: flex; }
@@ -206,6 +227,26 @@
   </div>
 </div>
 
+<div id="pcL" aria-hidden="false">
+  <div class="pcCard" style="text-align:center"><div style="font-weight:900;font-size:20px;background:linear-gradient(90deg,#e03131,#f59f00,#37b24d,#1c7ed6,#7048e8,#d6336c);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.12em">BON UTOPIA</div><div style="font-size:11px;font-weight:800;color:#8a6410">夢も、希望も、大当たりも！</div></div>
+  <div id="pcOshiBox"><div id="pcSay">いっしょに遊ぼうね！</div><img id="pcOshi" alt=""></div>
+  <div class="pcCard"><h3>いまの記録</h3><div class="pcStats"><div>持ち玉<b id="pcHave">0</b></div><div>ボンコイン<b id="pcCoin">0</b></div><div>回転<b id="pcSpin">0</b></div><div>大当たり<b id="pcWin">0</b></div></div></div>
+</div>
+<div id="pcR">
+  <div class="pcCard"><h3>キーボード操作</h3><div class="pcKeys">
+    <kbd>Space</kbd><span>おしっぱなしで玉を発射</span>
+    <kbd>← →</kbd><span>ハンドルの強さを調節</span>
+    <kbd>1</kbd><span>左打ち</span><kbd>2</kbd><span>右打ち</span>
+    <kbd>A</kbd><span>連続発射 ON/OFF</span>
+    <kbd>S</kbd><span>演出スキップ</span>
+    <kbd>Z</kbd><span>液晶を大きく</span>
+    <kbd>M</kbd><span>音 ON/OFF</span>
+    <kbd>H</kbd><span>遊び方</span>
+    <kbd>F</kbd><span>全画面</span>
+  </div></div>
+  <div class="pcCard"><h3>パソコンで遊ぶとき</h3><div style="font-size:12px">ブラウザのウィンドウを広げると、この画面になるよ。マウスでも、キーボードでも遊べるよ。</div></div>
+  <div class="pcBtns"><button id="pcInstall" type="button" style="display:none">💻 アプリとしてインストール</button><button id="pcFull" type="button">⛶ 全画面にする</button><button id="pcHow" type="button">❓ 遊び方を見る</button></div>
+</div>
 <script>
 /* ============================================================
    ORIGINAL PACHINKO SIMULATOR  第1段階
@@ -1710,6 +1751,42 @@ window.addEventListener('keydown', e => {
   if (e.code === 'ArrowLeft' && !sideLock) { angleDeg = Math.max(-135, angleDeg - 5); updateDial(); }
 });
 window.addEventListener('keyup', e => { if (e.code === 'Space') stopFire(); });
+/* PC：キーボードのショートカット（メニュー・設定などを開いているときは無効） */
+window.addEventListener('keydown', e => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target && e.target.tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+  if (document.querySelector('.ov.show')) return;
+  const click = id => { const b = document.getElementById(id); if (b) b.click(); };
+  switch (e.code) {
+    case 'KeyA': click('bAuto'); break;
+    case 'KeyS': click('bSkip'); break;
+    case 'KeyZ': click('lcdZoom'); break;
+    case 'KeyM': click('bSnd'); break;
+    case 'KeyH': click('bHow'); break;
+    case 'Digit1': case 'Numpad1': click('bL'); break;
+    case 'Digit2': case 'Numpad2': click('bR'); break;
+    case 'KeyF': togglePcFull(); break;
+  }
+});
+function togglePcFull() { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }
+/* PC：左右パネルの表示更新（推しボンの立ち絵・セリフ・記録） */
+(function () {
+  const L = document.getElementById('pcL'); if (!L) return;
+  let lastKey = '', lastBi = -1, lastLineAt = -1;
+  const $t = (id, v) => { const el = document.getElementById(id); if (el && el.textContent !== String(v)) el.textContent = v; };
+  setInterval(() => {
+    if (!L.offsetParent && getComputedStyle(L).display === 'none') return;
+    try {
+      $t('pcHave', document.getElementById('hHave').textContent); $t('pcCoin', document.getElementById('hCoin').textContent);
+      $t('pcSpin', document.getElementById('sSpin').textContent); $t('pcWin', document.getElementById('sWin').textContent);
+      const bi = oshiBon(), n = oshiPoseN(), key = bi + ':' + n, img = document.getElementById('pcOshi');
+      if (key !== lastKey) { lastKey = key; const src = howBonSrc(bi, n); if (src && img.getAttribute('src') !== src) img.src = src; }
+      if (bi !== lastBi || (n !== lastLineAt && n % 4 === 0)) { lastBi = bi; lastLineAt = n; $t('pcSay', oshiLine(bi, G.rec.bestChain || 0)); }
+    } catch (e) {}
+  }, 300);
+  document.getElementById('pcFull').addEventListener('click', togglePcFull);
+  document.getElementById('pcHow').addEventListener('click', () => openHowTo(0));
+})();
 
 $('bSkip').addEventListener('click', () => skipEffect());
 $('bL').addEventListener('click', () => { if (sideLock === 'L') { sideLock = null; updateDial(); toast('ハンドルの固定を解除したよ'); return; } sideLock = 'L'; setSide('L'); toast('左打ちに固定：ヘソ（START）を狙おう（もう一度押すと解除）'); });
@@ -2419,6 +2496,37 @@ function openShare() {
 }
 /* ---------- 設定（音・表示・確率・ほか を1か所に） ---------- */
 /* 最新版に読み込み直す（セーブは残す）。画面右上の「更新」ボタンと設定の両方から使う */
+/* ---------- アプリとしてインストール（PC：Chrome・Edge など。単一HTMLのまま、マニフェストを実行時に作る） ---------- */
+let installEv = null;
+(function () {
+  try {
+    if (!/^https?:$/.test(location.protocol)) return;   // 公開した https のページで有効（ファイルを直接開いたときは対象外）
+    const ic = document.querySelector('link[rel="icon"]'); if (!ic) return;
+    const im = new Image(); im.onload = () => {
+      try {
+        const cv = document.createElement('canvas'); cv.width = cv.height = 512; const c = cv.getContext('2d'); c.drawImage(im, 0, 0, 512, 512);
+        cv.toBlob(b => {
+          try {
+            const icon512 = URL.createObjectURL(b);
+            const man = { name: 'BON UTOPIA', short_name: 'BON UTOPIA', description: '夢も、希望も、大当たりも！', start_url: location.href.split('#')[0], scope: location.href.split('#')[0].replace(/[^/]*$/, ''), display: 'standalone', background_color: '#150b2e', theme_color: '#2a1850', lang: 'ja', icons: [{ src: ic.href, sizes: '192x192', type: 'image/png', purpose: 'any' }, { src: icon512, sizes: '512x512', type: 'image/png', purpose: 'any' }] };
+            const l = document.createElement('link'); l.rel = 'manifest'; l.href = URL.createObjectURL(new Blob([JSON.stringify(man)], { type: 'application/manifest+json' })); document.head.appendChild(l);
+          } catch (e) {}
+        }, 'image/png');
+      } catch (e) {}
+    }; im.src = ic.href;
+  } catch (e) {}
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEv = e; const b = document.getElementById('pcInstall'); if (b) b.style.display = ''; });
+  window.addEventListener('appinstalled', () => { installEv = null; const b = document.getElementById('pcInstall'); if (b) b.style.display = 'none'; try { toast('インストールしたよ！'); } catch (e) {} });
+  setTimeout(() => { const b = document.getElementById('pcInstall'); if (b) b.addEventListener('click', () => installApp()); }, 0);
+})();
+function installApp() {
+  if (installEv) { const e = installEv; installEv = null; try { e.prompt(); e.userChoice && e.userChoice.then(() => { const b = document.getElementById('pcInstall'); if (b) b.style.display = 'none'; }); } catch (x) {} return; }
+  openSub(`<h2 style="font-size:22px">💻 アプリとしてインストール</h2><div style="font-size:13px;line-height:1.75;margin:8px 0;text-align:left">
+    <p style="margin:0 0 8px"><b>Chrome・Edge（Windows / Mac）</b><br>アドレスバーの右はしにある「インストール」のマークを押すか、メニュー（︙）の「BON UTOPIA をインストール」（Edgeは「アプリ」→「このサイトをアプリとしてインストール」）を選んでね。</p>
+    <p style="margin:0 0 8px"><b>Safari（Mac）</b><br>メニューの「ファイル」→「Dock に追加」。</p>
+    <p style="margin:0 0 8px"><b>iPhone・iPad・Android</b><br>共有ボタン（または︙）から「ホーム画面に追加」。</p>
+    <p style="margin:0;color:#8a6a30;font-size:12px">インストールはインターネットに公開したページで使えるよ（ファイルを直接開いているときは出ないよ）。インストールしても、セーブはそのまま使えるよ。</p></div>${closeBtn}`);
+}
 function reloadLatest() {
   try { saveGame(); } catch (e) {} wiped = true;
   const go = () => { location.replace(location.pathname + '?v=' + Date.now()); };
@@ -2441,11 +2549,13 @@ function openSettings() {
   else h += row('台の確率（大当たり）', `<div style="font-size:12px;color:#6b4a1a">いまは 1/${LOTTERY.prob}。遊んでいる最中に、画面の「🎰 確率」から変えられるよ。</div>`);
   h += row('ほか', `<div class="bgmsel" style="grid-template-columns:repeat(2,1fr)"><button id="stHow">❓ 遊び方</button><button id="stData">📊 データ</button><button id="stCust">🎨 カスタム</button><button id="stShare">📸 シェア</button></div>`);
   h += `<div class="bgmsel" style="grid-template-columns:repeat(2,1fr);margin-top:12px"><button id="stBak">データのバックアップ</button><button id="stReload">最新版に読み込み直す</button></div><div style="font-size:11px;color:#8a6a30;margin-top:4px;line-height:1.5">バックアップのコードを保存しておけば、アプリを入れ直してもデータをもどせるよ。「読み込み直す」はデータを消さずに最新のページを取り直すよ。</div>`;
+  h += `<div style="margin-top:8px"><button id="stInstall" type="button" style="flex:none;width:100%;min-height:40px">💻 アプリとしてインストール</button></div>`;
   h += `<div style="margin-top:12px;text-align:center"><button id="stWipe" style="flex:none;width:100%;min-height:38px;border-radius:10px;border:2px solid #b3261e;background:#fff;color:#b3261e;font-weight:800">🗑 データを削除</button></div>`;
   openSub(h + closeBtn);
   const box = $('subBox');
   const again = () => openSettings();
   $('stReload').onclick = reloadLatest;
+  $('stInstall').onclick = installApp;
   $('stBak').onclick = () => {
     saveGame(); let code = '';
     try { const o = {}; Object.keys(localStorage).filter(k => k.indexOf('bonutopia_') === 0 || k === 'pachi_prob').forEach(k => { o[k] = localStorage.getItem(k); }); code = btoa(unescape(encodeURIComponent(JSON.stringify(o)))); } catch (e) {}
@@ -2585,26 +2695,94 @@ const QUIZ = [
 let quizCur = null;
 function quizState() { const t = todayKey(); if (G.quiz.date !== t) G.quiz = { date: t, count: 0, ok: 0, asked: [] }; return G.quiz; }
 const quizLeft = () => Math.max(0, QUIZ_PER_DAY - quizState().count);
+/* ---- クイズの種類：ボンの設定／パチンコ豆知識／ゲームのひみつ／○×／だれのセリフ？／シルエット ---- */
+const QUIZ_PACHI = [
+  Q('大当たりは、全部で何ラウンドある？', ['10ラウンド', '5ラウンド', '20ラウンド', '3ラウンド'], 'このゲームの大当たりは10ラウンドだよ。'),
+  Q('確変は何回転まで続く？', ['50回転', '10回転', '100回転', '無限'], '確変は50回転まで。終わったら左打ちにもどすよ。'),
+  Q('時短は何回転まで続く？', ['100回転', '50回転', '10回転', '500回転'], '時短は100回転。玉が減りにくいモードだよ。'),
+  Q('保留は最大いくつまでたまる？', ['8つ', '4つ', '12個', '2つ'], '保留は最大8つ。回転中に入った玉の順番待ちだよ。'),
+  Q('「スタートチャッカー」に玉が入ると？', ['スロットが1回まわる', '大当たり確定', '玉が増える', '音楽が変わる'], 'スタートチャッカーに入ると、スロットが1回まわって抽選されるよ。'),
+  Q('大当たり中に開く大きな入口は？', ['アタッカー', 'ヘソ', '風車', '釘'], '大当たり中はアタッカーが開いて、玉がどんどん入るよ。'),
+  Q('確変・時短中は、どっちに打つ？', ['右打ち', '左打ち', '真上', 'どっちでもいい'], '確変・時短中は右打ち。右側の電チューが開きやすくなるよ。'),
+  Q('通常のとき（普段）は、どっちに打つ？', ['左打ち', '右打ち', '真上', '下'], '普段は左打ち。玉を弱めに打つよ。'),
+  Q('「電チュー」ってなに？', ['右側にある入口', '電気のおもちゃ', '大当たりのBGM', '玉を抜くボタン'], '電チューは右側にある入口。確変・時短中に玉が入りやすくなるよ。'),
+  Q('保留の色で、いちばんアツいのは？', ['虹色', '青', '緑', '赤'], '青→緑→赤→虹の順にアツくなるよ。虹が出たら覚悟してね。'),
+  Q('4円パチンコは、ボンコイン1枚で何玉借りられる？', ['250玉', '1000玉', '50玉', '100玉'], '4円パチンコは250玉、1円パチンコは1000玉だよ。'),
+  Q('1円パチンコは、ボンコイン1枚で何玉借りられる？', ['1000玉', '250玉', '500玉', '10玉'], '1円パチンコは1000玉。どんどん打てるよ。'),
+  Q('ボンコインは、どれくらいで1枚回復する？', ['1時間', '10分', '1日', '1週間'], 'ボンコインは1時間に1枚、自動で回復するよ。'),
+  Q('3つの図柄のうち2つがそろった状態は？', ['リーチ', 'ハズレ', 'プレミアム', '確変'], '2つそろうとリーチ！最後の1つがそろえば大当たりだよ。'),
+  Q('このゲームで、玉を現金に替えられる？', ['替えられない', '替えられる', '1円だけ', '10000玉から'], '完全無料・換金なし。玉は景品交換所でガチャなどに使えるよ。'),
+  Q('見たくない演出を飛ばすボタンは？', ['演出スキップ', '連続発射', '貸玉', '玉戻し'], '「演出スキップ」で、演出を飛ばせるよ。'),
+];
+const QUIZ_GAME = [
+  Q('玉の景品交換所は、メニューのどこにある？', ['「続きから」のすぐ下', '一番下', '設定の中', 'タイトルの上'], 'メニューの「続きから」のすぐ下にあるよ。'),
+  Q('ガチャは全部で何種類？', ['3種類', '1種類', '5種類', '10種類'], 'ボンカード・カスタムパーツ・着せ替えの3種類だよ。'),
+  Q('ボンカードのガチャは、何玉で引ける？', ['150玉', '300玉', '1000玉', '10玉'], 'ボンカードは150玉。ほかは300玉だよ。'),
+  Q('推しボンを選ぶと、色が変わらないのは？', ['ボタンの色', '液晶', '盤面', '玉と釘'], '液晶・盤面・玉・釘が推しボンの色になるよ。'),
+  Q('通常変動曲の2曲は？', ['UTOPIA SPIN!!! と UTOPIA SPIN???', 'WORLD PRISM と UTOPIA PRISM', 'BONBON FEVER!! と UTOPIA SPIN!!!', 'ボンちゃんマーチ と WORLD PRISM'], '通常変動曲は「UTOPIA SPIN!!!」と「UTOPIA SPIN???」。期待度が高いほど「!!!」が流れやすいよ。'),
+  Q('Bontifyを開いている間に流れる曲は？', ['WORLD PRISM', 'UTOPIA SPIN!!!', 'BONBON FEVER!!', 'ボンちゃんマーチ'], 'Bontifyでは「WORLD PRISM」が流れるよ。'),
+  Q('大当たりのテーマ曲に選べるのは？', ['UTOPIA PRISM と BONBON FEVER!!', 'WORLD PRISM と UTOPIA SPIN???', 'ボンちゃんマーチ だけ', '魔法の言葉 だけ'], '大当たり曲は「UTOPIA PRISM」と「BONBON FEVER!!」から選べるよ。'),
+  Q('ボンクイズは、1日に何問できる？', ['3問', '1問', '10問', '無制限'], '1日3問まで。正解するとボンコイン1枚もらえるよ。'),
+  Q('応援ガチャは、1日に何回引ける？', ['1回', '3回', '10回', '無制限'], '応援ガチャは1日1回、コインを使わずに引けるよ。'),
+  Q('シェア画像でセリフを言うボンは、どこから選べる？', ['ガチャで引いたボンカードの柄', '図鑑の全員', '最初の3人だけ', '選べない'], 'ガチャで引いたカードの柄のボンから選べるよ。'),
+  Q('台の枠に「ある」のは？', ['北欧風・アンデス風・アジア風・アフリカ風・中東風', '宇宙風', '海底風', 'ホラー風'], '台の枠には、北欧・アンデス・アジア・アフリカ・中東の民族風があるよ。'),
+  Q('データを消さずに最新版にするボタンは？', ['右上の「更新」', '「玉戻し」', '「連続発射」', '「貸玉」'], '右上の「更新」を押すと、セーブを残したまま最新版になるよ。'),
+  Q('BON UTOPIA を遊べるのは？', ['18歳以上', '6歳以上', '12歳以上', '何歳でも'], 'BON UTOPIA は18歳以上向けだよ。'),
+];
+/* ○×：[文, 正しいか, 解説] */
+const QUIZ_TF = [
+  ['ひょえボンは、語尾に「ボン」をつけて話す。', false, 'ひょえボンは一人称が「ボン」。語尾に「ボン」はつけないよ。'],
+  ['おこボンの一人称は「アタシ」。', true, 'おこボンは「アタシ」だよ。'],
+  ['にじボンの髪は虹色。', false, 'にじボンの髪は白。服やリュックが虹色だよ。'],
+  ['もぐボンは関西弁で話す。', false, 'もぐボンは関西弁ではなく、「〜だよ〜」とのばして話すよ。'],
+  ['ボンちゃんたちは、みんなお赤飯が大好き。', true, 'ボンちゃんはみんなお赤飯が大好きだよ。'],
+  ['ねむボンはどこでも寝られる。', true, 'ねむボンは、どこででも寝られるよ。'],
+  ['てれボンの得意技は、かけっこ。', false, 'てれボンはかくれんぼが得意だよ。'],
+  ['確変のあとは、左打ちにもどす。', true, '確変や時短が終わったら、左打ちにもどすよ。'],
+  ['保留は、最大8つまでためられる。', true, '保留は最大8つだよ。'],
+  ['このゲームは、課金すると大当たりしやすくなる。', false, 'このゲームは完全無料。課金も換金もないよ。'],
+  ['保留の色や予告は、当たりやすさを変える。', false, '保留の色や予告は、お楽しみの演出だよ。当たりやすさは変わらないよ。'],
+  ['ボンクイズは、正解するとボンコインがもらえる。', true, '正解すると、ボンコインが1枚もらえるよ。'],
+  ['景品交換所で、玉を現金に替えられる。', false, '換金はできないよ。ガチャなどに使えるよ。'],
+  ['にこボンは歌とダンスが得意。', true, 'にこボンは歌とダンスが得意だよ。'],
+  ['にじボンの一人称は「ぼく」。', false, 'にじボンの一人称は「我輩」だよ。'],
+  ['てれボンは恥ずかしがり屋で、敬語で話す。', true, 'てれボンは「私」で、敬語で話すよ。'],
+];
+function quizMake(S) {
+  const rnd = n => Math.floor(Math.random() * n), shuffle = a => a.slice().sort(() => Math.random() - 0.5);
+  const pickFrom = (arr, pre) => { let ids = arr.map((_, i) => i).filter(i => !S.asked.includes(pre + i)); if (!ids.length) ids = arr.map((_, i) => i); return ids[rnd(ids.length)]; };
+  const r = Math.random();
+  if (r < 0.28) { const i = pickFrom(QUIZ, 'c'); const q = QUIZ[i]; return { kind: 'ボンの設定', key: 'c' + i, q: q.q, a: q.a, n: q.n, order: shuffle([0, 1, 2, 3]) }; }
+  if (r < 0.46) { const i = pickFrom(QUIZ_PACHI, 'p'); const q = QUIZ_PACHI[i]; return { kind: 'パチンコ豆知識', key: 'p' + i, q: q.q, a: q.a, n: q.n, order: shuffle([0, 1, 2, 3]) }; }
+  if (r < 0.62) { const i = pickFrom(QUIZ_GAME, 'g'); const q = QUIZ_GAME[i]; return { kind: 'ゲームのひみつ', key: 'g' + i, q: q.q, a: q.a, n: q.n, order: shuffle([0, 1, 2, 3]) }; }
+  if (r < 0.78) { const i = pickFrom(QUIZ_TF, 't'); const [st, ok, n] = QUIZ_TF[i]; return { kind: '○×クイズ', key: 't' + i, q: st, a: ok ? ['⭕ 正しい', '❌ まちがい'] : ['❌ まちがい', '⭕ 正しい'], n, order: ok ? [0, 1] : [1, 0] }; }
+  const bi = rnd(7), others = shuffle([0, 1, 2, 3, 4, 5, 6].filter(x => x !== bi)).slice(0, 3), names = [bi, ...others].map(x => SYMBOL_NAMES[x]);
+  if (r < 0.9) {
+    const L = OSHI_LINES[bi], cat = ['zero', 'low', 'mid', 'high', 'big'][rnd(5)], line = L[cat][rnd(L[cat].length)].replace(/\{n\}/g, String(3 + rnd(4)));
+    return { kind: 'だれのセリフ？', key: 's', q: `「${line}」\nこのセリフを言うのは？`, a: names, n: `正解は${SYMBOL_NAMES[bi]}。話し方でわかったかな？`, order: shuffle([0, 1, 2, 3]) };
+  }
+  return { kind: 'シルエットクイズ', key: 'z', q: 'このシルエットはだれ？', img: howBonSrc(bi, rnd(4)), a: names, n: `正解は${SYMBOL_NAMES[bi]}。`, order: shuffle([0, 1, 2, 3]) };
+}
 function openQuiz() {
   const S = quizState();
   if (S.count >= QUIZ_PER_DAY) {
     openSub(`<h2 style="font-size:22px">🧠 ボンクイズ</h2><p style="text-align:center;font-weight:800;margin:12px 0">きょうの3問は おしまい！<br>（正解 ${S.ok} / ${S.count}）<br>また明日、挑戦してね。</p>${closeBtn}`);
     return;
   }
-  let pool = QUIZ.map((_, i) => i).filter(i => !S.asked.includes(i)); if (!pool.length) pool = QUIZ.map((_, i) => i);
-  const idx = pool[Math.floor(Math.random() * pool.length)], q = QUIZ[idx];
-  const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
-  quizCur = { idx, order, done: false };
+  const q = quizMake(S);
+  quizCur = { q, key: q.key, order: q.order, done: false };
   let h = `<h2 style="font-size:22px">🧠 ボンクイズ</h2><div style="text-align:center;font-size:11px;color:#8a6a30">きょう ${S.count + 1} 問目 / ${QUIZ_PER_DAY}問　正解で🪙1枚</div>
-    <p style="font-weight:900;font-size:16px;margin:10px 0 4px;line-height:1.5">${esc(q.q)}</p>`;
-  order.forEach((o, k) => { h += `<button class="qchoice" data-k="${k}">${'ABCD'[k]}　${esc(q.a[o])}</button>`; });
+    <div style="text-align:center;margin-top:6px"><span style="display:inline-block;background:#fff0c4;border:1.5px solid #e0b84a;border-radius:999px;padding:1px 12px;font-size:11px;font-weight:900;color:#8a5a00">${q.kind}</span></div>`;
+  if (q.img) h += `<div style="text-align:center;margin:6px 0"><img src="${q.img}" alt="" style="height:150px;max-width:70%;object-fit:contain;filter:brightness(0) drop-shadow(0 2px 3px rgba(0,0,0,.3))"></div>`;
+  h += `<p style="font-weight:900;font-size:16px;margin:10px 0 4px;line-height:1.5;white-space:pre-line">${esc(q.q)}</p>`;
+  q.order.forEach((o, k) => { h += `<button class="qchoice" data-k="${k}">${'ABCD'[k]}　${esc(q.a[o])}</button>`; });
   openSub(h + '<button class="big" data-close="1" style="margin-top:12px">あとでやる</button>');
   document.querySelectorAll('#subBox .qchoice').forEach(b => b.onclick = () => answerQuiz(+b.dataset.k));
 }
 function answerQuiz(k) {
   if (!quizCur || quizCur.done) return; quizCur.done = true;
-  const S = quizState(), q = QUIZ[quizCur.idx], right = quizCur.order[k] === 0;
-  S.count++; S.asked.push(quizCur.idx); G.rec.quizAll++;
+  const S = quizState(), q = quizCur.q, right = quizCur.order[k] === 0;
+  S.count++; if (quizCur.key.length > 1) S.asked.push(quizCur.key); G.rec.quizAll++;
   if (right) { S.ok++; G.rec.quizOk++; save.coins += 1; }
   saveGame();
   document.querySelectorAll('#subBox .qchoice').forEach((b, i) => { b.disabled = true; if (quizCur.order[i] === 0) b.classList.add('ok'); else if (i === k) b.classList.add('ng'); });
