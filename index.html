@@ -267,7 +267,7 @@ const CONFIG = {
   nailJitter: 0.35,        // 釘衝突時のランダム度合い
   maxSpeed: 2500,
   fireInterval: 0.35,      // 発射間隔(秒)
-  powerMin: 1150, powerMax: 2100, // 発射速度(px/s)
+  powerMin: 700, powerMax: 1950, // 発射速度(px/s)
   maxBallsOnBoard: 100,
   subSteps: 8,
 };
@@ -1089,7 +1089,7 @@ function powerOf() { return (angleDeg + 135) / 270; }
 function speedOf() {
   /* 左打ち(強さ0.6未満)は盤の左をまわる速さ(〜1380)、右打ち(0.66以上)は上を越えて右へ行く速さ(1420〜)。この境目は変えない */
   const p = powerOf();
-  return p < 0.63 ? 1000 + (p / 0.63) * 380 : 1420 + (p - 0.63) / 0.37 * (CONFIG.powerMax - 1420);
+  return p < 0.63 ? 700 + p * 1100 : 1420 + (p - 0.63) / 0.37 * (CONFIG.powerMax - 1420);
 }
 
 const needSide = () => (MODE.k === 'bonus' || (typeof supportOn === 'function' && supportOn())) ? 'R' : 'L';
