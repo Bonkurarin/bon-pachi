@@ -436,8 +436,21 @@ const PARTS = {
   PARTS[27 + i] = { kind: 'skin', sub: 'board', key: 'board-' + k, name: nm + '盤面', desc: nm + 'の色の盤面になる', col: bc };
 });
 /* 推しボンの色（液晶・盤面・玉・釘に、いつも自動で反映）。「おまかせ」で、まだ当たりが無いときは通常色のまま */
+/* 民族風の配色セット（台の色を、推しボンではなく選んだ民族風でそろえるとき） */
+const ETH_TONE = {
+  wa: { lcd: ['#2a3a8a', '#080c2a'], board: ['#f6d8e0', '#c8506a', '#2a3a6a'] },
+  india: { lcd: ['#c8307a', '#2a0618'], board: ['#ffc060', '#e8601a', '#a01a5a'] },
+  mexico: { lcd: ['#1a8a5a', '#04201a'], board: ['#ffe060', '#e8306a', '#1a8a5a'] },
+  celtic: { lcd: ['#2a7a3a', '#06200c'], board: ['#e8d890', '#3a9a4a', '#144a22'] },
+  andes: { lcd: ['#c8283a', '#2a0a10'], board: ['#ffd070', '#e0262a', '#6a1a30'] },
+  asia: { lcd: ['#0f8a8a', '#031c1c'], board: ['#ffe27a', '#d8a020', '#0f5a5a'] },
+  africa: { lcd: ['#c8781a', '#2a1406'], board: ['#f0c060', '#c8283a', '#2c1c0e'] },
+  mideast: { lcd: ['#1a4a9a', '#041030'], board: ['#7ae8e0', '#2a8ab8', '#10305a'] }
+};
 function oshiTone() {
   try {
+    const fb = frameBon(); if (fb >= 0) { const lc = PARTS[20 + fb], bd = PARTS[27 + fb]; if (lc && bd) return { lcd: lc.col, board: bd.col, ball: ['#ffffff', bd.col[0], bd.col[1], bd.col[2]], nail: ['#ffffff', bd.col[0], bd.col[1]] }; }
+    if (ETH_TONE[custom.frame]) { const t = ETH_TONE[custom.frame]; return { lcd: t.lcd, board: t.board, ball: ['#ffffff', t.board[0], t.board[1], t.board[2]], nail: ['#ffffff', t.board[0], t.board[1]] }; }
     if (bgmCfg.sel === 'auto' && !(Array.isArray(G.hist) && G.hist.length)) return null;
     const bi = oshiBon(), lc = PARTS[20 + bi], bd = PARTS[27 + bi]; if (!lc || !bd) return null;
     return { lcd: lc.col, board: bd.col, ball: ['#ffffff', bd.col[0], bd.col[1], bd.col[2]], nail: ['#ffffff', bd.col[0], bd.col[1]] };
@@ -457,8 +470,9 @@ function gachaRoll(kind) {
   return ids[ids.length - 1];
 }
 const partOwned = key => Object.keys(PARTS).some(id => PARTS[id].key === key && (G.gacha.cards[id] || 0) > 0);
-let custom = { deco: 'on', frame: 'museum', hold: 'dot', fx: 'none', ykChar: 'auto', yk: {}, lcd: 'none', board: 'none', sym: 'normal', ball: 'silver', nail: 'gold', ui: 'gold', reach: 'none', art: 'new', oshiDeco: 'on' };
+let custom = { deco: 'on', frame: 'asia', hold: 'dot', fx: 'none', ykChar: 'auto', yk: {}, lcd: 'none', board: 'none', sym: 'normal', ball: 'silver', nail: 'gold', ui: 'gold', reach: 'none', art: 'new', oshiDeco: 'on', ethcol: 'off' };
 try { const sv = JSON.parse(localStorage.getItem('bonutopia_custom') || 'null'); if (sv && typeof sv === 'object') custom = Object.assign(custom, sv); } catch (e) {}
+if (!['wa', 'india', 'mexico', 'celtic', 'andes', 'asia', 'africa', 'mideast', 'bon0', 'bon1', 'bon2', 'bon3', 'bon4', 'bon5', 'bon6'].includes(custom.frame)) custom.frame = 'asia';   // 以前の枠（金・リボンなど）は、アジア風に切り替え
 const BON_C = [['おこボン', 'oko', '#e0506a', '255,60,70', '#fff0f0'], ['にこボン', 'niko', '#f2b632', '255,200,60', '#fff8e0'], ['ひょえボン', 'hyoe', '#3f8ae0', '60,120,255', '#eef6ff'], ['もぐボン', 'mogu', '#3fa564', '60,200,110', '#effbe8'], ['ねむボン', 'nemu', '#7a5ad0', '170,80,255', '#f3eeff'], ['てれボン', 'tere', '#e0689a', '255,120,170', '#fff0f6']];
 const mixc = (hex, t) => { const n = parseInt(hex.slice(1), 16), c = k => Math.round(((n >> k) & 255) * (1 - t) + 255 * t); return '#' + [16, 8, 0].map(k => c(k).toString(16).padStart(2, '0')).join(''); };
 const dk = (hex, t) => { const n = parseInt(hex.slice(1), 16), c = k => Math.round(((n >> k) & 255) * t); return '#' + [16, 8, 0].map(k => c(k).toString(16).padStart(2, '0')).join(''); };
@@ -1329,7 +1343,7 @@ function drawBonFrame(c) {
   });
   c.restore();
 }
-const FRAME_STYLE = { museum: '博物館風（ふつう）', gold: '金の枠', ribbon: 'リボンの枠', flower: 'お花の枠', cool: 'かっこいい（ネオン）', crystal: '綺麗（真珠とクリスタル）', strict: '厳格（黒と金）', wa: '和風（組紐）', nordic: '北欧風', andes: 'アンデス風', asia: 'アジア風', africa: 'アフリカ風', mideast: '中東風' };
+const FRAME_STYLE = { wa: '和風（日本）', andes: 'アンデス風', asia: 'アジア風', africa: 'アフリカ風', mideast: '中東風', india: 'インド風', mexico: 'メキシコ風', celtic: 'ケルト（アイルランド）風', bon0: 'おこボンカラー', bon1: 'にこボンカラー', bon2: 'ひょえボンカラー', bon3: 'もぐボンカラー', bon4: 'ねむボンカラー', bon5: 'てれボンカラー', bon6: 'にじボンカラー' };
 function framePts() {
   const R7 = RC + 7, cx1 = FRAME + RC, cx2 = W - FRAME - RC, cy = FRAME + RC, pts = [];
   const seg = (x0, y0, x1, y1, step) => { const L = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.round(L / step)); for (let i = 0; i < n; i++) { const t = i / n; pts.push({ x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t, a: Math.atan2(y1 - y0, x1 - x0) }); } };
@@ -1339,8 +1353,13 @@ function framePts() {
   return { pts, path, cx1, cx2, cy, R7 };
 }
 const FR_COL = ['#e0506a', '#f2b632', '#3f8ae0', '#3fa564', '#7a5ad0', '#e0689a', '#fffaf0'];
+/* 台の枠＝民族風の柄5種 × 推しボンの色7色。柄は推しボンごとのおまかせか、自分で固定。色は常に推しボンの色 */
+/* 台の枠＝民族風の柄5種。推しボンとは別に、自分で選ぶ */
+const frameBon = () => { const m = /^bon([0-6])$/.exec(custom.frame || ''); return m ? +m[1] : -1; };   // ボンカラーの枠なら、そのボンの番号
+function curFrame() { return frameBon() >= 0 || (FRAME_ETHNIC[custom.frame] || custom.frame === 'wa') ? custom.frame : 'asia'; }
 function drawFrameStyle(c) {
-  const st = custom.frame || 'museum';
+  const st = curFrame();
+  if (/^bon[0-6]$/.test(st)) return drawBonColorFrame(c, +st.slice(3));
   if (st === 'gold') return;
   if (st === 'ribbon') return drawRibbonFrame(c);
   if (st === 'flower') return drawFlowerFrame(c);
@@ -1352,10 +1371,25 @@ function drawFrameStyle(c) {
   drawBonFrame(c);
 }
 /* 民族風の枠（見た目だけ）。北欧・アンデス・アジア・アフリカ・中東 */
-const FRAME_ETHNIC = { nordic: 1, andes: 1, asia: 1, africa: 1, mideast: 1 };
+const FRAME_ETHNIC = { india: 1, mexico: 1, celtic: 1, andes: 1, asia: 1, africa: 1, mideast: 1 };
+const hexRgb = h => { h = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); };
+const mixHex = (h, t, k) => { const a = hexRgb(h), b = hexRgb(t); return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+/* ボンカラーの枠：そのボンの色のひし形と、白い玉をならべた枠 */
+function drawBonColorFrame(c, bi) {
+  const F = framePts(), bc = (BON_C[bi] && BON_C[bi][2]) || '#e0506a', rainbow = bi === 6, RB = FR_COL.slice(0, 6);
+  const dk = k => mixHex(bc, '#000000', k), lt = k => mixHex(bc, '#ffffff', k);
+  c.save(); F.path(c); c.lineWidth = 13; c.strokeStyle = rainbow ? '#2a1850' : dk(0.55); c.stroke();
+  F.pts.forEach((p, i) => {
+    c.save(); c.translate(p.x, p.y); c.rotate(p.a);
+    if (i % 2 === 0) { c.beginPath(); c.moveTo(0, -5); c.lineTo(4, 0); c.lineTo(0, 5); c.lineTo(-4, 0); c.closePath(); c.fillStyle = rainbow ? RB[(i / 2 | 0) % 6] : (i % 4 === 0 ? bc : lt(0.35)); c.fill(); c.strokeStyle = rainbow ? '#fff' : lt(0.75); c.lineWidth = 0.8; c.stroke(); }
+    else { c.beginPath(); c.arc(0, 0, 2.2, 0, 7); c.fillStyle = rainbow ? '#fff' : lt(0.85); c.fill(); }
+    c.restore();
+  });
+  F.path(c); c.lineWidth = 0.9; c.strokeStyle = rainbow ? '#fff' : lt(0.6); c.stroke(); c.restore();
+}
 function drawEthnicFrame(c, st) {
   const F = framePts(); c.save();
-  const base = { nordic: '#eef3fa', andes: '#4a2418', asia: '#0f5a5a', africa: '#2c1c0e', mideast: '#10305a' }[st];
+  const base = { india: '#6a1a4a', mexico: '#14502a', celtic: '#12301a', andes: '#4a2418', asia: '#0f5a5a', africa: '#2c1c0e', mideast: '#10305a' }[st];
   F.path(c); c.lineWidth = 13; c.strokeStyle = base; c.stroke();
   const AND = ['#e0262a', '#f2b632', '#2a9a5a', '#d8309a', '#2a7ad0'], AFR = ['#e0a020', '#2a8a3a', '#c8283a', '#15120e'];
   F.pts.forEach((p, i) => {
@@ -1363,6 +1397,15 @@ function drawEthnicFrame(c, st) {
     if (st === 'nordic') {   // 雪の結晶と、赤と紺のひし形（ノルディック柄）
       if (i % 3 === 0) { c.strokeStyle = '#2a5a9a'; c.lineWidth = 1.2; c.lineCap = 'round'; for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; c.beginPath(); c.moveTo(Math.cos(a) * -4.6, Math.sin(a) * -4.6); c.lineTo(Math.cos(a) * 4.6, Math.sin(a) * 4.6); c.stroke(); } }
       else { c.beginPath(); c.moveTo(0, -4.2); c.lineTo(3.2, 0); c.lineTo(0, 4.2); c.lineTo(-3.2, 0); c.closePath(); c.fillStyle = i % 3 === 1 ? '#c8283a' : '#1f3a6a'; c.fill(); }
+    } else if (st === 'india') {   // ペイズリーとマリーゴールド
+      if (i % 2 === 0) { c.fillStyle = '#ffb030'; c.beginPath(); c.moveTo(-3, 4.6); c.bezierCurveTo(-5.5, -1, 0, -6, 3.6, -3.6); c.bezierCurveTo(1.6, -2.4, 2.6, 1, 0.4, 4.6); c.closePath(); c.fill(); c.fillStyle = '#e8306a'; c.beginPath(); c.arc(-0.6, 0.4, 1.3, 0, 7); c.fill(); }
+      else { c.fillStyle = '#ff8a1a'; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; c.beginPath(); c.ellipse(Math.cos(a) * 2.6, Math.sin(a) * 2.6, 1.5, 1, a, 0, 7); c.fill(); } c.beginPath(); c.arc(0, 0, 1.3, 0, 7); c.fillStyle = '#fff3d8'; c.fill(); }
+    } else if (st === 'mexico') {   // パペル・ピカドの旗と刺繍の花
+      if (i % 2 === 0) { c.fillStyle = ['#e8306a', '#ffd23a', '#2ab0e0', '#6ad04a', '#ff8a1a'][(i / 2 | 0) % 5]; c.beginPath(); c.moveTo(-4.6, -4.6); c.lineTo(4.6, -4.6); c.lineTo(4.6, 3); c.lineTo(2.3, 1.2); c.lineTo(0, 3); c.lineTo(-2.3, 1.2); c.lineTo(-4.6, 3); c.closePath(); c.fill(); }
+      else { c.fillStyle = '#fff3d8'; for (let k = 0; k < 5; k++) { const a = k * Math.PI * 2 / 5; c.beginPath(); c.arc(Math.cos(a) * 2.6, Math.sin(a) * 2.6, 1.7, 0, 7); c.fill(); } c.beginPath(); c.arc(0, 0, 1.4, 0, 7); c.fillStyle = '#e8306a'; c.fill(); }
+    } else if (st === 'celtic') {   // 組み紐の結び目とクローバー
+      if (i % 2 === 0) { c.strokeStyle = '#e8d890'; c.lineWidth = 1.5; c.lineCap = 'round'; c.beginPath(); c.arc(-2.2, 0, 2.6, 0, 7); c.stroke(); c.beginPath(); c.arc(2.2, 0, 2.6, 0, 7); c.stroke(); }
+      else { c.fillStyle = '#4ab85a'; for (let k = 0; k < 3; k++) { const a = -Math.PI / 2 + k * Math.PI * 2 / 3; c.beginPath(); c.arc(Math.cos(a) * 2.1, Math.sin(a) * 2.1 + 0.4, 1.9, 0, 7); c.fill(); } c.strokeStyle = '#4ab85a'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 4.6); c.stroke(); }
     } else if (st === 'andes') {   // 織物のギザギザ（段々の三角）
       c.beginPath(); c.moveTo(-5, 4.6); c.lineTo(0, -4.6); c.lineTo(5, 4.6); c.closePath(); c.fillStyle = AND[i % 5]; c.fill();
       c.beginPath(); c.moveTo(-2, 4.6); c.lineTo(0, 0.6); c.lineTo(2, 4.6); c.closePath(); c.fillStyle = '#fff3d8'; c.fill();
@@ -1378,7 +1421,7 @@ function drawEthnicFrame(c, st) {
     }
     c.restore();
   });
-  F.path(c); c.lineWidth = 0.9; c.strokeStyle = { nordic: '#9ab4d8', andes: '#f2b632', asia: '#f2c84a', africa: '#e0a020', mideast: '#f2c84a' }[st]; c.stroke();
+  F.path(c); c.lineWidth = 0.9; c.strokeStyle = { india: '#ffb030', mexico: '#ffd23a', celtic: '#e8d890', andes: '#f2b632', asia: '#f2c84a', africa: '#e0a020', mideast: '#f2c84a' }[st]; c.stroke();
   c.restore();
 }
 function drawRibbonFrame(c) {
@@ -3091,7 +3134,7 @@ function openCustom(tab) {
     h += opt('oshi', 'auto', bgmCfg.sel === 'auto', 'おまかせ', '当たった図柄の子', false);
     for (let i = 0; i < 7; i++) h += opt('oshi', i, bgmCfg.sel === i, SYMBOL_NAMES[i], '', !bonOpen(i));
     h += '</div>';
-    grp('台の枠', 'frame', custom.frame, FRAME_STYLE);
+    grp('台の枠（選んだ枠に合わせて、釘・玉・液晶・盤面の色もそろうよ）', 'frame', custom.frame, FRAME_STYLE);
     grp('盤面の動く飾り（ボンのシャボン玉）', 'deco', custom.deco, { on: 'あり', off: 'なし' });
     grp('図柄（ボン）の見せ方（見た目だけ）', 'sym', custom.sym, SYM_STYLE);
     grp('推しボンの飾り（台の横と液晶の隅に立ち絵。予告でポーズが変わる）', 'oshiDeco', custom.oshiDeco, { on: 'あり', off: 'なし' });
@@ -3115,7 +3158,7 @@ function openCustom(tab) {
   box.querySelectorAll('[data-ctab]').forEach(b => b.onclick = () => openCustom(b.dataset.ctab));
   box.querySelectorAll('[data-lk]').forEach(b => b.onclick = () => {
     const [a, v] = b.dataset.lk.split(':'); custom[a] = v; saveCustom();
-    if (a === 'ball' || a === 'nail' || a === 'frame') renderStatic(); if (a === 'ui') applyUiTheme(); again();
+    if (a === 'ball' || a === 'nail' || a === 'frame' || a === 'ethcol') renderStatic(); if (a === 'ui') applyUiTheme(); again();
   });
   box.querySelectorAll('[data-oshi]').forEach(b => b.onclick = () => { bgmCfg.sel = b.dataset.oshi === 'auto' ? 'auto' : +b.dataset.oshi; saveBgmCfg(); try { renderStatic(); } catch (e) {} again(); });
   box.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => { custom.hold = b.dataset.hold; saveCustom(); again(); });
